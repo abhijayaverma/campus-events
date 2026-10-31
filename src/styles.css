@@ -98,3 +98,7 @@
 .saved-event-button{border:1px solid #e6ebe2;background:#fff;color:#6e805f}
 .saved-event-button:disabled{opacity:.55;cursor:wait}
 .save-modal-button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:0 0 12px;padding:11px}
+
+
+.account-profile-form{margin:0 0 34px}
+.account-profile-form .primary-button{margin-top:2px}
