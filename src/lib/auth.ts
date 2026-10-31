@@ -16,7 +16,7 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 export async function resetPasswordWithEmail(email: string) {
-  const redirectTo = `${window.location.origin}/account`
+  const redirectTo = 'https://campus-events-sable.vercel.app/account'
   const { error } = await requireSupabase().auth.resetPasswordForEmail(email, { redirectTo })
   if (error) throw error
 }
