@@ -75,6 +75,10 @@ export default function App() {
   const [dashboardError, setDashboardError] = useState('')
   const [cancelBusy, setCancelBusy] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<'student' | 'organizer' | 'admin'>('student')
+  const [profile, setProfile] = useState({ full_name: '', university: '', department: '', student_id: '' })
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileMessage, setProfileMessage] = useState('')
+  const [profileError, setProfileError] = useState('')
   const [eventFormOpen, setEventFormOpen] = useState(false)
   const [eventSaving, setEventSaving] = useState(false)
   const [eventFormError, setEventFormError] = useState('')
@@ -172,6 +176,30 @@ export default function App() {
     }
   }
 
+  async function handleProfileSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!user || !supabase) return
+    setProfileSaving(true)
+    setProfileError('')
+    setProfileMessage('')
+    try {
+      const { error } = await supabase.from('profiles').update({
+        full_name: profile.full_name.trim(),
+        university: profile.university.trim() || null,
+        department: profile.department.trim() || null,
+        student_id: profile.student_id.trim() || null,
+      }).eq('id', user.id)
+      if (error) throw error
+      const { error: metadataError } = await supabase.auth.updateUser({ data: { full_name: profile.full_name.trim() } })
+      if (metadataError) throw metadataError
+      setProfileMessage('Your profile has been updated.')
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Could not update your profile.')
+    } finally {
+      setProfileSaving(false)
+    }
+  }
+
   async function handleSignOut() {
     try {
       await signOut()
@@ -185,8 +213,16 @@ export default function App() {
     let active = true
     async function loadRole() {
       if (!user || !supabase) { setUserRole('student'); return }
-      const { data, error } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (active && !error && data?.role) setUserRole(data.role as 'student' | 'organizer' | 'admin')
+      const { data, error } = await supabase.from('profiles').select('role,full_name,university,department,student_id').eq('id', user.id).single()
+      if (active && !error && data) {
+        if (data.role) setUserRole(data.role as 'student' | 'organizer' | 'admin')
+        setProfile({
+          full_name: data.full_name ?? user.user_metadata?.full_name ?? '',
+          university: data.university ?? '',
+          department: data.department ?? '',
+          student_id: data.student_id ?? '',
+        })
+      }
     }
     loadRole()
     return () => { active = false }
@@ -498,9 +534,21 @@ export default function App() {
       {page === 'account' && (user ? <section className="account-section section-wrap" id="my-account">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">YOUR CAMPUSLY SPACE</div><h2>My <span className="serif-accent">account.</span></h2><p>Manage your profile and keep track of your campus plans.</p></div></div>
         <div className="account-profile">
-          <div className="profile-avatar">{(user.user_metadata?.full_name || user.email || 'S').toString().charAt(0).toUpperCase()}</div>
-          <div><strong>{user.user_metadata?.full_name || 'Campusly student'}</strong><span>{user.email}</span><small>Student account</small></div>
+          <div className="profile-avatar">{(profile.full_name || user.email || 'S').toString().charAt(0).toUpperCase()}</div>
+          <div><strong>{profile.full_name || 'Campusly student'}</strong><span>{user.email}</span><small>{userRole === 'admin' ? 'Super admin account' : userRole === 'organizer' ? 'Organizer account' : 'Student account'}</small></div>
         </div>
+        <div className="account-list-heading"><h3>Profile details</h3><span>Keep your information up to date</span></div>
+        {profileError && <p className="auth-error" role="alert">{profileError}</p>}
+        {profileMessage && <p className="auth-message" role="status">{profileMessage}</p>}
+        <form className="organizer-form account-profile-form" onSubmit={handleProfileSave}>
+          <label>Full name<input required maxLength={100} value={profile.full_name} onChange={e => setProfile({...profile,full_name:e.target.value})}/></label>
+          <div className="organizer-form-grid">
+            <label>College / University<input maxLength={150} value={profile.university} onChange={e => setProfile({...profile,university:e.target.value})} placeholder="Your institution"/></label>
+            <label>Department<input maxLength={120} value={profile.department} onChange={e => setProfile({...profile,department:e.target.value})} placeholder="Your department"/></label>
+            <label>Student ID (optional)<input maxLength={80} value={profile.student_id} onChange={e => setProfile({...profile,student_id:e.target.value})} placeholder="Your student ID"/></label>
+          </div>
+          <button className="primary-button" type="submit" disabled={profileSaving}>{profileSaving ? 'Saving…' : 'Save profile'} <ArrowRight size={16}/></button>
+        </form>
         <div className="account-list-heading"><h3>Saved events</h3><span>{savedEventIds.length} saved</span></div>
         {savedEventIds.length === 0 ? <div className="account-empty">Save events from Discover and they will appear here.</div> : <div className="registration-list">{events.filter(item => savedEventIds.includes(item.id)).map(item => <article className="registration-item" key={item.id}><div><strong>{item.title}</strong><span>{item.category} · {item.venue}, {item.city}</span><small>{item.date} · {item.time}</small></div><button className="cancel-registration" disabled={savedBusy === item.id} onClick={() => handleToggleSaved(item.id)}>Remove saved event</button></article>)}</div>}
         <div className="account-list-heading"><h3>My registrations</h3><span>{myRegistrations.filter(item => item.status === 'registered').length} active</span></div>
