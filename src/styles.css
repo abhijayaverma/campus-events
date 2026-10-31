@@ -42,3 +42,13 @@
 .cancel-registration:disabled{opacity:.6;cursor:wait}
 .account-empty{padding:28px;background:#f1f4ee;border-radius:9px;text-align:center;color:#7e897f;font-size:11px;line-height:1.7}
 @media(max-width:680px){.account-section{padding-top:55px;padding-bottom:55px}.registration-item{align-items:flex-start;flex-direction:column}.cancel-registration{align-self:flex-start}.account-profile{margin-bottom:27px}}
+
+.organizer-dashboard{padding-top:65px;padding-bottom:65px;border-top:1px solid #e8ece6}
+.organizer-form{display:grid;gap:16px;padding:24px;background:#fff;border:1px solid #e8ece6;border-radius:11px}
+.organizer-form label{display:grid;gap:7px;font-size:11px;font-weight:700;color:#415449}
+.organizer-form input,.organizer-form textarea,.organizer-form select{width:100%;border:1px solid #e2e9df;border-radius:7px;padding:11px 12px;font:400 12px 'DM Sans',sans-serif;color:#263b30;background:#fbfcfa;outline:none}
+.organizer-form input:focus,.organizer-form textarea:focus,.organizer-form select:focus{border-color:#91b66b;box-shadow:0 0 0 3px #dff0cc80}
+.organizer-form textarea{resize:vertical;line-height:1.6}
+.organizer-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.organizer-form .primary-button{justify-self:start}
+@media(max-width:680px){.organizer-dashboard{padding-top:50px;padding-bottom:50px}.organizer-form{padding:17px}.organizer-form-grid{grid-template-columns:1fr}}
