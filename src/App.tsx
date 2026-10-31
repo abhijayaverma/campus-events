@@ -324,11 +324,19 @@ export default function App() {
     }
   }
 
-  const filtered = useMemo(() => events.filter(event =>
-    (activeCategory === 'All events' || event.category.toLowerCase() === activeCategory.toLowerCase()) &&
-    (city === 'All cities' || event.city.toLowerCase() === city.toLowerCase()) &&
-    `${event.title} ${event.category} ${event.city} ${event.venue}`.toLowerCase().includes(query.toLowerCase())
-  ), [events, activeCategory, query, city])
+  const availableCities = useMemo(() =>
+    [...new Set(events.map(event => event.city.trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b)),
+  [events])
+
+  const filtered = useMemo(() => {
+    const searchTerms = query.trim().toLocaleLowerCase()
+    return events.filter(event =>
+      (activeCategory === 'All events' || event.category.toLowerCase() === activeCategory.toLowerCase()) &&
+      (city === 'All cities' || event.city.toLowerCase() === city.toLowerCase()) &&
+      (!searchTerms || `${event.title} ${event.category} ${event.description} ${event.city} ${event.venue}`.toLocaleLowerCase().includes(searchTerms))
+    )
+  }, [events, activeCategory, query, city])
   const featured = filtered[0]
   const selected = events.find(event => event.id === selectedEvent)
   const goExplore = () => window.location.assign('/events')
@@ -361,7 +369,7 @@ export default function App() {
           <p className="hero-description">The workshops, ideas, people and experiences worth showing up for — all in one place.</p>
           <div className="hero-search">
             <div className="search-field"><Search size={19}/><input aria-label="Search events" placeholder="Search events, workshops, colleges..." value={query} onChange={e => setQuery(e.target.value)}/></div>
-            <div className="location-field"><MapPin size={18}/><select aria-label="Choose city" value={city} onChange={e => setCity(e.target.value)}><option>Kanpur</option><option>Lucknow</option><option>Delhi</option><option>Jaipur</option><option>All cities</option></select><ChevronDown size={15}/></div>
+            <div className="location-field"><MapPin size={18}/><select aria-label="Choose city" value={city} onChange={e => setCity(e.target.value)}><option>All cities</option>{availableCities.map(item => <option key={item} value={item}>{item}</option>)}</select><ChevronDown size={15}/></div>
             <button aria-label="Search" className="search-submit" onClick={goExplore}><ArrowRight size={20}/></button>
           </div>
           <div className="hero-note"><Sparkles size={15}/>Discover something beyond your timetable.</div>
@@ -380,7 +388,7 @@ export default function App() {
           <div className="featured-image"><img src={featured.image} alt=""/><span className="featured-label"><Sparkles size={13}/>FEATURED EVENT</span></div>
           <div className="featured-content"><div className="event-meta"><span>{featured.category}</span><span className="meta-dot"/> {featured.date}</div><h3>{featured.title}</h3><p>{featured.description}</p><div className="featured-details"><span><MapPin size={15}/>{featured.venue}, {featured.city}</span><span><CalendarDays size={15}/>{featured.time}</span></div><div className="featured-footer"><span className="free-tag">{featured.price}</span><button className="dark-button" onClick={() => setSelectedEvent(featured.id)}>View event <ArrowRight size={16}/></button></div></div>
         </div>}
-        <div className="section-heading events-heading" id="all-events"><div><div className="eyebrow muted-eyebrow">THE CAMPUS CALENDAR</div><h2>Explore <span className="serif-accent">events.</span></h2></div><span className="result-count">{loading ? 'Loading events…' : `${filtered.length} events in ${city === 'All cities' ? 'India' : city}`}</span></div>
+        <div className="section-heading events-heading" id="all-events"><div><div className="eyebrow muted-eyebrow">THE CAMPUS CALENDAR</div><h2>Explore <span className="serif-accent">events.</span></h2></div><span className="result-count">{loading ? 'Loading events…' : `${filtered.length} ${filtered.length === 1 ? 'event' : 'events'} in ${city === 'All cities' ? 'all cities' : city}`}</span></div>
         <div className="filter-row" role="tablist" aria-label="Filter events by category">{categories.map(category => <button key={category} role="tab" aria-selected={activeCategory === category} className={activeCategory === category ? 'filter-chip selected' : 'filter-chip'} onClick={() => setActiveCategory(category)}>{category}</button>)}</div>
         <div className="event-grid">
           {filtered.map(event => <article className="event-card" key={event.id}>
