@@ -41,6 +41,14 @@ export async function createEvent(input: NewEvent) {
 }
 
 
+export async function updateOrganizerEvent(eventId: string, input: NewEvent) {
+  const { status: _status, ...changes } = input
+  const { data, error } = await requireSupabase().from('events')
+    .update(changes).eq('id', eventId).select().single()
+  if (error) throw error
+  return data as EventRecord
+}
+
 export async function getAdminEvents() {
   const { data, error } = await requireSupabase().from('events').select('*')
     .order('created_at', { ascending: false })
