@@ -177,7 +177,11 @@ export default function App() {
       setDashboardError('')
       try {
         const registrations = await getMyRegistrations()
-        if (active) setMyRegistrations(registrations as typeof myRegistrations)
+        if (active) setMyRegistrations(registrations.map(item => ({
+          id: item.id as string,
+          status: item.status as string,
+          event: (Array.isArray(item.event) ? item.event[0] : item.event) ?? null,
+        })))
       } catch (error) {
         if (active) setDashboardError(error instanceof Error ? error.message : 'Could not load your registrations.')
       } finally {
