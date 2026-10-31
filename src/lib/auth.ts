@@ -15,6 +15,12 @@ export async function signInWithEmail(email: string, password: string) {
   return data
 }
 
+export async function resetPasswordWithEmail(email: string) {
+  const redirectTo = `${window.location.origin}/account`
+  const { error } = await requireSupabase().auth.resetPasswordForEmail(email, { redirectTo })
+  if (error) throw error
+}
+
 export async function signOut() {
   const { error } = await requireSupabase().auth.signOut()
   if (error) throw error
