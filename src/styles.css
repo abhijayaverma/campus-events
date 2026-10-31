@@ -102,3 +102,6 @@
 
 .account-profile-form{margin:0 0 34px}
 .account-profile-form .primary-button{margin-top:2px}
+
+
+.organizer-capacity{margin:12px 0 9px;max-width:420px}.organizer-capacity-label{display:flex;justify-content:space-between;gap:12px;margin-bottom:6px;font-size:10px;color:#77837a}.organizer-capacity-track{height:7px;background:#edf1e9;border-radius:99px;overflow:hidden}.organizer-capacity-track span{display:block;height:100%;background:#91ad70;border-radius:99px;transition:width .2s ease}
