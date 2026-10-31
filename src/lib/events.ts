@@ -120,3 +120,14 @@ export async function unsaveEvent(eventId: string) {
     .delete().eq('user_id', user.id).eq('event_id', eventId)
   if (error) throw error
 }
+
+
+export async function getSavedEventIds() {
+  const client = requireSupabase()
+  const { data: { user }, error: userError } = await client.auth.getUser()
+  if (userError) throw userError
+  if (!user) return []
+  const { data, error } = await client.from('saved_events').select('event_id').order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(item => item.event_id as string)
+}
