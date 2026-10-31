@@ -90,6 +90,8 @@ export default function App() {
   const [organizerEvents, setOrganizerEvents] = useState<EventRecord[]>([])
   const [organizerRegistrations, setOrganizerRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string;event_title:string}>>([])
   const [organizerAttendeesError, setOrganizerAttendeesError] = useState('')
+  const [organizerAttendeeQuery, setOrganizerAttendeeQuery] = useState('')
+  const [organizerAttendeeStatus, setOrganizerAttendeeStatus] = useState('all')
   const [adminLoading, setAdminLoading] = useState(false)
   const [adminError, setAdminError] = useState('')
   const [adminBusy, setAdminBusy] = useState<string | null>(null)
@@ -248,6 +250,13 @@ export default function App() {
     loadAdminEvents()
     return () => { active = false }
   }, [user, userRole])
+
+  const filteredOrganizerRegistrations = organizerRegistrations.filter(item => {
+    const query = organizerAttendeeQuery.trim().toLowerCase()
+    const matchesQuery = !query || `${item.event_title} ${item.user_id}`.toLowerCase().includes(query)
+    const matchesStatus = organizerAttendeeStatus === 'all' || item.status === organizerAttendeeStatus
+    return matchesQuery && matchesStatus
+  })
 
   const activeAdminRegistrations = adminRegistrations.filter(item => item.status === 'registered')
   const popularAdminEvents = adminEvents.map(item => ({ ...item, registrations: activeAdminRegistrations.filter(registration => registration.event_id === item.id).length }))
@@ -586,7 +595,8 @@ export default function App() {
         <div className="organizer-attendees">
           <div className="account-list-heading"><h3>Event attendees</h3><span>{organizerRegistrations.filter(item => item.status === 'registered').length} active registrations</span><button className="cancel-registration" type="button" disabled={organizerRegistrations.length === 0} onClick={exportOrganizerAttendees}>Export CSV</button></div>
           {organizerAttendeesError && <p className="auth-error" role="alert">{organizerAttendeesError}</p>}
-          {organizerRegistrations.length === 0 ? <div className="account-empty">Attendee registrations for your events will appear here.</div> : <div className="registration-list">{organizerRegistrations.map(item => <article className="registration-item" key={item.id}><div><strong>{item.event_title}</strong><span>Attendee ID: <code>{item.user_id}</code></span><small>Registered {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.created_at))}</small><em className={item.status === 'registered' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div></article>)}</div>}
+          {organizerRegistrations.length > 0 && <div className="filter-row"><input aria-label="Search attendees" placeholder="Search event or attendee ID…" value={organizerAttendeeQuery} onChange={event => setOrganizerAttendeeQuery(event.target.value)}/><select aria-label="Filter registration status" value={organizerAttendeeStatus} onChange={event => setOrganizerAttendeeStatus(event.target.value)}><option value="all">All statuses</option><option value="registered">Registered</option><option value="cancelled">Cancelled</option><option value="attended">Attended</option></select></div>}
+          {organizerRegistrations.length === 0 ? <div className="account-empty">Attendee registrations for your events will appear here.</div> : filteredOrganizerRegistrations.length === 0 ? <div className="account-empty">No attendees match your search or status filter.</div> : <div className="registration-list">{filteredOrganizerRegistrations.map(item => <article className="registration-item" key={item.id}><div><strong>{item.event_title}</strong><span>Attendee ID: <code>{item.user_id}</code></span><small>Registered {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.created_at))}</small><em className={item.status === 'registered' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div></article>)}</div>}
         </div>
       </section> : <section className="route-access section-wrap"><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Organizer access</h2><p>Sign in with an organizer account to create events and manage attendees.</p><button className="primary-button" onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>Sign in</button></section>)}
       {page === 'account' && (user ? <section className="account-section section-wrap" id="my-account">
