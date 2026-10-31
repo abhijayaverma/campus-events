@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
 import { getPublishedEvents, type EventRecord } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
@@ -99,7 +99,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setAuthBusy(true)
     setAuthError('')
