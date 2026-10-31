@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { cancelRegistration, getMyRegistrations, getPublishedEvents, registerForEvent, type EventRecord } from './lib/events'
+import { cancelRegistration, createEvent, getMyRegistrations, getPublishedEvents, registerForEvent, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -72,6 +72,12 @@ export default function App() {
   const [dashboardLoading, setDashboardLoading] = useState(false)
   const [dashboardError, setDashboardError] = useState('')
   const [cancelBusy, setCancelBusy] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<'student' | 'organizer' | 'admin'>('student')
+  const [eventFormOpen, setEventFormOpen] = useState(false)
+  const [eventSaving, setEventSaving] = useState(false)
+  const [eventFormError, setEventFormError] = useState('')
+  const [eventFormMessage, setEventFormMessage] = useState('')
+  const [newEvent, setNewEvent] = useState({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
 
   useEffect(() => {
     let active = true
@@ -168,6 +174,46 @@ export default function App() {
 
   useEffect(() => {
     let active = true
+    async function loadRole() {
+      if (!user || !supabase) { setUserRole('student'); return }
+      const { data, error } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (active && !error && data?.role) setUserRole(data.role as 'student' | 'organizer' | 'admin')
+    }
+    loadRole()
+    return () => { active = false }
+  }, [user])
+
+  async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setEventSaving(true)
+    setEventFormError('')
+    setEventFormMessage('')
+    try {
+      const payload: NewEvent = {
+        title: newEvent.title.trim(),
+        description: newEvent.description.trim(),
+        category: newEvent.category,
+        venue: newEvent.venue.trim(),
+        city: newEvent.city.trim(),
+        starts_at: new Date(newEvent.starts_at).toISOString(),
+        ends_at: new Date(newEvent.ends_at).toISOString(),
+        cover_image_url: newEvent.cover_image_url.trim() || undefined,
+        capacity: newEvent.capacity ? Number(newEvent.capacity) : undefined,
+        status: 'pending',
+      }
+      await createEvent(payload)
+      setEventFormMessage('Event submitted for review. It will appear publicly after approval.')
+      setNewEvent({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
+      setEventFormOpen(false)
+    } catch (error) {
+      setEventFormError(error instanceof Error ? error.message : 'Could not submit event.')
+    } finally {
+      setEventSaving(false)
+    }
+  }
+
+  useEffect(() => {
+    let active = true
     async function loadMyRegistrations() {
       if (!user) {
         setMyRegistrations([])
@@ -223,7 +269,7 @@ export default function App() {
         <a className="nav-link" href="#organizers" onClick={() => setMobileMenuOpen(false)}>For organizers</a>
       </nav>
       <div className="header-actions">
-        <button className="text-button" onClick={() => document.getElementById('organizers')?.scrollIntoView({ behavior: 'smooth' })}>Host an event</button>
+        <button className="text-button" onClick={() => document.getElementById(user && (userRole === 'organizer' || userRole === 'admin') ? 'organizer-dashboard' : 'organizers')?.scrollIntoView({ behavior: 'smooth' })}>Host an event</button>
         {user ? <><button className="text-button account-button" onClick={() => document.getElementById('my-account')?.scrollIntoView({ behavior: 'smooth' })}>My account</button><button className="text-button account-button" onClick={handleSignOut}>Sign out</button></> : <button className="text-button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); setAuthOpen(true) }}>Sign in</button>}
         <button className="primary-button header-cta" onClick={goExplore}>Explore events <ArrowRight size={16}/></button>
       </div>
@@ -266,6 +312,26 @@ export default function App() {
           {!loading && filtered.length === 0 && <div className="empty-state"><Search size={28}/><h3>{loadError ? 'Events could not be loaded' : 'No published events yet'}</h3><p>{loadError || 'There are no published events matching your filters. Check back soon or try another city.'}</p><button className="text-button" onClick={() => { setQuery(''); setActiveCategory('All events'); setCity('All cities') }}>Clear filters</button></div>}
         </div>
       </section>
+      {user && (userRole === 'organizer' || userRole === 'admin') && <section className="organizer-dashboard section-wrap" id="organizer-dashboard">
+        <div className="section-heading"><div><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Host an <span className="serif-accent">event.</span></h2><p>Submit campus events for review and publication.</p></div><button className="primary-button" onClick={() => { setEventFormOpen(!eventFormOpen); setEventFormError(''); setEventFormMessage('') }}>{eventFormOpen ? 'Close form' : 'Create event'}</button></div>
+        {eventFormMessage && <p className="auth-message">{eventFormMessage}</p>}
+        {eventFormError && <p className="auth-error" role="alert">{eventFormError}</p>}
+        {eventFormOpen && <form className="organizer-form" onSubmit={handleCreateEvent}>
+          <label>Event title<input required maxLength={120} value={newEvent.title} onChange={e=>setNewEvent({...newEvent,title:e.target.value})}/></label>
+          <label>Description<textarea required rows={4} value={newEvent.description} onChange={e=>setNewEvent({...newEvent,description:e.target.value})}/></label>
+          <div className="organizer-form-grid">
+            <label>Category<select value={newEvent.category} onChange={e=>setNewEvent({...newEvent,category:e.target.value})}>{categories.slice(1).map(item=><option key={item}>{item}</option>)}</select></label>
+            <label>City<input required value={newEvent.city} onChange={e=>setNewEvent({...newEvent,city:e.target.value})}/></label>
+            <label>Venue<input required value={newEvent.venue} onChange={e=>setNewEvent({...newEvent,venue:e.target.value})}/></label>
+            <label>Capacity (optional)<input type="number" min="1" value={newEvent.capacity} onChange={e=>setNewEvent({...newEvent,capacity:e.target.value})}/></label>
+            <label>Starts at<input type="datetime-local" required value={newEvent.starts_at} onChange={e=>setNewEvent({...newEvent,starts_at:e.target.value})}/></label>
+            <label>Ends at<input type="datetime-local" required value={newEvent.ends_at} onChange={e=>setNewEvent({...newEvent,ends_at:e.target.value})}/></label>
+          </div>
+          <label>Cover image URL (optional)<input type="url" placeholder="https://…" value={newEvent.cover_image_url} onChange={e=>setNewEvent({...newEvent,cover_image_url:e.target.value})}/></label>
+          <button className="primary-button" type="submit" disabled={eventSaving}>{eventSaving ? 'Submitting…' : 'Submit for review'} <ArrowRight size={16}/></button>
+          <small className="auth-footnote">New events are submitted as pending and require approval before public listing.</small>
+        </form>}
+      </section>}
       {user && <section className="account-section section-wrap" id="my-account">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">YOUR CAMPUSLY SPACE</div><h2>My <span className="serif-accent">account.</span></h2><p>Manage your profile and keep track of your campus plans.</p></div></div>
         <div className="account-profile">
