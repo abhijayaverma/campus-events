@@ -50,7 +50,7 @@ function formatEvent(record: EventRecord): CampusEvent {
 export default function App() {
   const [activeCategory, setActiveCategory] = useState('All events')
   const [query, setQuery] = useState('')
-  const [city, setCity] = useState('Kanpur')
+  const [city, setCity] = useState('All cities')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
   const [events, setEvents] = useState<CampusEvent[]>([])
