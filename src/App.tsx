@@ -101,6 +101,8 @@ export default function App() {
   const [adminLoading, setAdminLoading] = useState(false)
   const [adminError, setAdminError] = useState('')
   const [adminBusy, setAdminBusy] = useState<string | null>(null)
+  const [adminEventQuery, setAdminEventQuery] = useState('')
+  const [adminEventStatus, setAdminEventStatus] = useState('all')
 
   useEffect(() => {
     let active = true
@@ -282,6 +284,12 @@ export default function App() {
     const matchesQuery = !query || `${item.event_title} ${item.user_id}`.toLowerCase().includes(query)
     const matchesStatus = organizerAttendeeStatus === 'all' || item.status === organizerAttendeeStatus
     return matchesQuery && matchesStatus
+  })
+
+  const filteredAdminEvents = adminEvents.filter(item => {
+    const query = adminEventQuery.trim().toLowerCase()
+    const matchesQuery = !query || `${item.title} ${item.description} ${item.category} ${item.venue} ${item.city} ${item.organizer_id}`.toLowerCase().includes(query)
+    return matchesQuery && (adminEventStatus === 'all' || item.status === adminEventStatus)
   })
 
   const activeAdminRegistrations = adminRegistrations.filter(item => item.status === 'registered')
@@ -598,8 +606,9 @@ export default function App() {
           {popularAdminEvents.length === 0 || popularAdminEvents.every(item => item.registrations === 0) ? <p className="admin-analytics-empty">Registration data will appear here as students book their places.</p> : <div className="admin-popular-list">{popularAdminEvents.map(item => <div className="admin-popular-row" key={item.id}><span title={item.title}>{item.title}</span><div className="admin-bar-track"><i style={{width:`${Math.max(3, item.registrations / Math.max(...popularAdminEvents.map(event => event.registrations)) * 100)}%`}}/></div><strong>{item.registrations}</strong></div>)}</div>}
         </div>
         {adminError && <p className="auth-error" role="alert">{adminError}</p>}
-        {adminLoading ? <div className="account-empty">Loading the Campusly event directory…</div> : adminEvents.length === 0 ? <div className="account-empty">No events have been submitted yet.</div> :
-          <div className="admin-event-list">{adminEvents.map(item => <article className="admin-event-card" key={item.id}>
+        {adminLoading ? <div className="account-empty">Loading the Campusly event directory…</div> : adminEvents.length === 0 ? <div className="account-empty">No events have been submitted yet.</div> : <>
+          <div className="filter-row admin-filter-row"><input aria-label="Search events" placeholder="Search title, venue, city or organizer ID…" value={adminEventQuery} onChange={event => setAdminEventQuery(event.target.value)}/><select aria-label="Filter event status" value={adminEventStatus} onChange={event => setAdminEventStatus(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="published">Published</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option><option value="completed">Completed</option><option value="draft">Draft</option></select><span className="admin-filter-count">{filteredAdminEvents.length} of {adminEvents.length} events</span></div>
+          {filteredAdminEvents.length === 0 ? <div className="account-empty">No events match your search or status filter.</div> : <div className="admin-event-list">{filteredAdminEvents.map(item => <article className="admin-event-card" key={item.id}>
             <div className="admin-event-top"><div><span className="admin-category">{item.category}</span><h3>{item.title}</h3></div><span className={'admin-status status-' + item.status}>{item.status}</span></div>
             <p>{item.description}</p>
             <div className="admin-event-details"><span><strong>Venue</strong>{item.venue}, {item.city}</span><span><strong>Starts</strong>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.starts_at))}</span><span><strong>Ends</strong>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.ends_at))}</span><span><strong>Organizer ID</strong><code>{item.organizer_id}</code></span><span><strong>Capacity</strong>{item.capacity ?? 'Not specified'}</span><span><strong>Submitted</strong>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium'}).format(new Date(item.created_at))}</span></div>
@@ -611,6 +620,7 @@ export default function App() {
               {item.status === 'rejected' && <button className="admin-reject" disabled={adminBusy === item.id} onClick={() => handleAdminEventStatus(item.id,'pending')}>Restore to pending</button>}
             </div>
           </article>)}</div>}
+          </>}
       </section> : <section className="route-access section-wrap"><div className="eyebrow muted-eyebrow">SUPER ADMIN</div><h2>Admin access required</h2><p>Sign in with an administrator account to manage Campusly events.</p></section>)}
       {page === 'organizer' && (user && (userRole === 'organizer' || userRole === 'admin') ? <section className="organizer-dashboard section-wrap" id="organizer-dashboard">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Host an <span className="serif-accent">event.</span></h2><p>Submit campus events for review and publication.</p></div><button className="primary-button" onClick={() => { setEventFormOpen(!eventFormOpen); setEventFormError(''); setEventFormMessage('') }}>{eventFormOpen ? 'Close form' : 'Create event'}</button></div>
