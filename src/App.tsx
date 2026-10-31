@@ -285,12 +285,12 @@ export default function App() {
     if (organizerRegistrations.length === 0) return
     const columns = ['Event', 'Attendee ID', 'Registration status', 'Registered at']
     const escapeCsv = (value: string) => {
-      const safe = /^[=+@\\-\\t\\r]/.test(value) ? "'" + value : value
+      const safe = ['=', '+', '-', '@', '\t', '\r'].some(prefix => value.startsWith(prefix)) ? "'" + value : value
       return '"' + safe.replace(/"/g, '""') + '"'
     }
     const rows = organizerRegistrations.map(item => [item.event_title, item.user_id, item.status, new Date(item.created_at).toISOString()])
-    const csv = [columns, ...rows].map(row => row.map(value => escapeCsv(String(value))).join(',')).join('\\r\\n')
-    const blob = new Blob(['\\uFEFF', csv], { type: 'text/csv;charset=utf-8;' })
+    const csv = [columns, ...rows].map(row => row.map(value => escapeCsv(String(value))).join(',')).join(String.fromCharCode(13, 10))
+    const blob = new Blob([String.fromCharCode(65279), csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
