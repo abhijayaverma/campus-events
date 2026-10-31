@@ -331,20 +331,23 @@ export default function App() {
   ), [activeCategory, query, city])
   const featured = filtered[0]
   const selected = events.find(event => event.id === selectedEvent)
-  const goExplore = () => document.getElementById('explore')?.scrollIntoView({ behavior: 'smooth' })
+  const goExplore = () => window.location.assign('/events')
 
-  return <div className="app-shell">
+  const currentPage = window.location.pathname.replace(/\\/$/, '') || '/'
+  const page = currentPage === '/admin' ? 'admin' : currentPage === '/organizer' ? 'organizer' : currentPage === '/account' ? 'account' : 'events'
+
+  return <div className="app-shell" data-page={page}>
     <header className="site-header">
       <a className="brand" href="#"><span className="brand-mark"><GraduationCap size={21}/></span><span>campus<span className="brand-accent">ly</span></span></a>
       <nav className={mobileMenuOpen ? 'main-nav nav-open' : 'main-nav'}>
-        <a className="nav-link active" href="#explore" onClick={() => setMobileMenuOpen(false)}>Discover</a>
-        <a className="nav-link" href="#how-it-works" onClick={() => setMobileMenuOpen(false)}>How it works</a>
-        <a className="nav-link" href="#organizers" onClick={() => setMobileMenuOpen(false)}>For organizers</a>
-        {user && userRole === 'admin' && <a className="nav-link" href="#super-admin" onClick={() => setMobileMenuOpen(false)}>Super Admin</a>}
+        <a className="nav-link active" href="/events" onClick={() => setMobileMenuOpen(false)}>Discover</a>
+        <a className="nav-link" href="/events#how-it-works" onClick={() => setMobileMenuOpen(false)}>How it works</a>
+        <a className="nav-link" href="/organizer" onClick={() => setMobileMenuOpen(false)}>For organizers</a>
+        {user && userRole === 'admin' && <a className="nav-link" href="/admin" onClick={() => setMobileMenuOpen(false)}>Super Admin</a>}
       </nav>
       <div className="header-actions">
-        <button className="text-button" onClick={() => document.getElementById(user && (userRole === 'organizer' || userRole === 'admin') ? 'organizer-dashboard' : 'organizers')?.scrollIntoView({ behavior: 'smooth' })}>Host an event</button>
-        {user ? <><button className="text-button account-button" onClick={() => document.getElementById('my-account')?.scrollIntoView({ behavior: 'smooth' })}>My account</button><button className="text-button account-button" onClick={handleSignOut}>Sign out</button></> : <button className="text-button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); setAuthOpen(true) }}>Sign in</button>}
+        <button className="text-button" onClick={() => window.location.assign(user && (userRole === 'organizer' || userRole === 'admin') ? '/organizer' : '/organizer')}>Host an event</button>
+        {user ? <><button className="text-button account-button" onClick={() => window.location.assign('/account')}>My account</button><button className="text-button account-button" onClick={handleSignOut}>Sign out</button></> : <button className="text-button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); setAuthOpen(true) }}>Sign in</button>}
         <button className="primary-button header-cta" onClick={goExplore}>Explore events <ArrowRight size={16}/></button>
       </div>
       <button className="mobile-menu-button" aria-label="Toggle navigation" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>{mobileMenuOpen ? <X/> : <Menu/>}</button>
