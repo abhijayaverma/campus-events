@@ -621,7 +621,7 @@ export default function App() {
             </div>
           </article>)}</div>}
           </>}
-      </section> : <section className="route-access section-wrap"><div className="eyebrow muted-eyebrow">SUPER ADMIN</div><h2>Admin access required</h2><p>Sign in with an administrator account to manage Campusly events.</p></section>)}
+      </section> : <section className="route-access section-wrap"><div className="eyebrow muted-eyebrow">SUPER ADMIN</div><h2>Admin access required</h2><p>Sign in with an administrator account to manage Campusly events.</p><button className="primary-button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); setAuthOpen(true) }}>Sign in <ArrowRight size={16}/></button></section>)}
       {page === 'organizer' && (user && (userRole === 'organizer' || userRole === 'admin') ? <section className="organizer-dashboard section-wrap" id="organizer-dashboard">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Host an <span className="serif-accent">event.</span></h2><p>Submit campus events for review and publication.</p></div><button className="primary-button" onClick={() => { setEventFormOpen(!eventFormOpen); setEventFormError(''); setEventFormMessage('') }}>{eventFormOpen ? 'Close form' : 'Create event'}</button></div>
         {eventFormMessage && <p className="auth-message">{eventFormMessage}</p>}
