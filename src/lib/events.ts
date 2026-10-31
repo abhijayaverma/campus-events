@@ -48,6 +48,16 @@ export async function getAdminEvents() {
   return (data ?? []) as EventRecord[]
 }
 
+export async function getOrganizerEvents() {
+  const client = requireSupabase()
+  const { data: { user }, error: userError } = await client.auth.getUser()
+  if (userError) throw userError
+  if (!user) throw new Error('Sign in to view your events.')
+  const { data, error } = await client.from('events').select('*').eq('organizer_id', user.id).order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as EventRecord[]
+}
+
 export async function getOrganizerRegistrations() {
   const client = requireSupabase()
   const { data: { user }, error: userError } = await client.auth.getUser()
