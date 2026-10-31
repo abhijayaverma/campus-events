@@ -19,3 +19,26 @@
 .auth-switch button{border:0;background:none;color:#52783e;font-size:12px;font-weight:800;padding:0}
 .auth-footnote{display:block;text-align:center;font-size:9px;line-height:1.5;color:#9aa39b}
 @media(max-width:680px){.auth-modal-content{padding:30px 23px}.auth-modal-content h2{font-size:25px}}
+
+.account-section{padding-top:70px;padding-bottom:75px;border-top:1px solid #e8ece6}
+.account-profile{display:flex;align-items:center;gap:14px;padding:18px 20px;background:#eef2e9;border-radius:10px;margin:22px 0 35px}
+.profile-avatar{width:46px;height:46px;border-radius:50%;background:#d0ed8f;color:#294332;display:grid;place-items:center;font:800 19px Manrope}
+.account-profile strong,.account-profile span,.account-profile small{display:block}
+.account-profile strong{font:800 14px Manrope;color:#293a30}
+.account-profile span{font-size:11px;color:#718075;margin-top:4px}
+.account-profile small{font-size:9px;color:#789258;margin-top:4px;font-weight:700}
+.account-list-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}
+.account-list-heading h3{font:800 18px Manrope;color:#293a30;margin:0}
+.account-list-heading>span{font-size:10px;color:#789258;font-weight:800}
+.registration-list{display:grid;gap:10px}
+.registration-item{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:17px 18px;background:white;border:1px solid #e9eee6;border-radius:9px}
+.registration-item strong,.registration-item span,.registration-item small{display:block}
+.registration-item strong{font:800 13px Manrope;color:#293a30}
+.registration-item span{font-size:10px;color:#78847b;margin-top:5px}
+.registration-item small{font-size:9px;color:#98a198;margin-top:5px}
+.registration-status{display:inline-block!important;font-style:normal;text-transform:capitalize;font-size:9px!important;color:#879188!important;background:#f0f2ef;padding:4px 7px;border-radius:4px;margin-top:8px!important}
+.registration-status.active{background:#eaf4df;color:#53723e!important}
+.cancel-registration{border:1px solid #eadfdd;background:#fff;color:#9a5149;border-radius:6px;padding:9px 11px;font-size:10px;font-weight:700;white-space:nowrap}
+.cancel-registration:disabled{opacity:.6;cursor:wait}
+.account-empty{padding:28px;background:#f1f4ee;border-radius:9px;text-align:center;color:#7e897f;font-size:11px;line-height:1.7}
+@media(max-width:680px){.account-section{padding-top:55px;padding-bottom:55px}.registration-item{align-items:flex-start;flex-direction:column}.cancel-registration{align-self:flex-start}.account-profile{margin-bottom:27px}}
