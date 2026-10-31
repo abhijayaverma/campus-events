@@ -102,7 +102,7 @@ export default function App() {
   const [adminError, setAdminError] = useState('')
   const [adminBusy, setAdminBusy] = useState<string | null>(null)
   const [adminEventQuery, setAdminEventQuery] = useState('')
-  const [adminEventStatus, setAdminEventStatus] = useState('all')
+  const [adminEventStatus, setAdminEventStatusFilter] = useState('all')
 
   useEffect(() => {
     let active = true
@@ -607,7 +607,7 @@ export default function App() {
         </div>
         {adminError && <p className="auth-error" role="alert">{adminError}</p>}
         {adminLoading ? <div className="account-empty">Loading the Campusly event directory…</div> : adminEvents.length === 0 ? <div className="account-empty">No events have been submitted yet.</div> : <>
-          <div className="filter-row admin-filter-row"><input aria-label="Search events" placeholder="Search title, venue, city or organizer ID…" value={adminEventQuery} onChange={event => setAdminEventQuery(event.target.value)}/><select aria-label="Filter event status" value={adminEventStatus} onChange={event => setAdminEventStatus(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="published">Published</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option><option value="completed">Completed</option><option value="draft">Draft</option></select><span className="admin-filter-count">{filteredAdminEvents.length} of {adminEvents.length} events</span></div>
+          <div className="filter-row admin-filter-row"><input aria-label="Search events" placeholder="Search title, venue, city or organizer ID…" value={adminEventQuery} onChange={event => setAdminEventQuery(event.target.value)}/><select aria-label="Filter event status" value={adminEventStatus} onChange={event => setAdminEventStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="published">Published</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option><option value="completed">Completed</option><option value="draft">Draft</option></select><span className="admin-filter-count">{filteredAdminEvents.length} of {adminEvents.length} events</span></div>
           {filteredAdminEvents.length === 0 ? <div className="account-empty">No events match your search or status filter.</div> : <div className="admin-event-list">{filteredAdminEvents.map(item => <article className="admin-event-card" key={item.id}>
             <div className="admin-event-top"><div><span className="admin-category">{item.category}</span><h3>{item.title}</h3></div><span className={'admin-status status-' + item.status}>{item.status}</span></div>
             <p>{item.description}</p>
