@@ -353,6 +353,7 @@ export default function App() {
       <button className="mobile-menu-button" aria-label="Toggle navigation" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>{mobileMenuOpen ? <X/> : <Menu/>}</button>
     </header>
     <main>
+      {page === 'events' && <>
       <section className="hero">
         <div className="hero-copy">
           <div className="eyebrow"><span className="eyebrow-dot"/>YOUR CAMPUS, YOUR COMMUNITY</div>
@@ -389,7 +390,8 @@ export default function App() {
           {!loading && filtered.length === 0 && <div className="empty-state"><Search size={28}/><h3>{loadError ? 'Events could not be loaded' : 'No published events yet'}</h3><p>{loadError || 'There are no published events matching your filters. Check back soon or try another city.'}</p><button className="text-button" onClick={() => { setQuery(''); setActiveCategory('All events'); setCity('All cities') }}>Clear filters</button></div>}
         </div>
       </section>
-      {user && userRole === 'admin' && <section className="super-admin section-wrap" id="super-admin">
+      </>}
+      {page === 'admin' && (user && userRole === 'admin' ? <section className="super-admin section-wrap" id="super-admin">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">CAMPUSLY CONTROL CENTRE</div><h2>Super admin <span className="serif-accent">portal.</span></h2><p>Review every event submitted across Campusly and manage its publication status.</p></div><button className="primary-button" onClick={async () => { setAdminLoading(true); try { setAdminEvents(await getAdminEvents()); setAdminRegistrations(await getAdminRegistrations()) } catch (error) { setAdminError(error instanceof Error ? error.message : 'Could not refresh events.') } finally { setAdminLoading(false) } }}>Refresh events</button></div>
         <div className="admin-stats">
           <div><span>Total events</span><strong>{adminEvents.length}</strong></div>
@@ -419,8 +421,8 @@ export default function App() {
               {item.status === 'rejected' && <button className="admin-reject" disabled={adminBusy === item.id} onClick={() => handleAdminEventStatus(item.id,'pending')}>Restore to pending</button>}
             </div>
           </article>)}</div>}
-      </section>}
-      {user && (userRole === 'organizer' || userRole === 'admin') && <section className="organizer-dashboard section-wrap" id="organizer-dashboard">
+      </section> : <section className="route-access section-wrap"><div className="eyebrow muted-eyebrow">SUPER ADMIN</div><h2>Admin access required</h2><p>Sign in with an administrator account to manage Campusly events.</p></section>)}
+      {page === 'organizer' && (user && (userRole === 'organizer' || userRole === 'admin') ? <section className="organizer-dashboard section-wrap" id="organizer-dashboard">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Host an <span className="serif-accent">event.</span></h2><p>Submit campus events for review and publication.</p></div><button className="primary-button" onClick={() => { setEventFormOpen(!eventFormOpen); setEventFormError(''); setEventFormMessage('') }}>{eventFormOpen ? 'Close form' : 'Create event'}</button></div>
         {eventFormMessage && <p className="auth-message">{eventFormMessage}</p>}
         {eventFormError && <p className="auth-error" role="alert">{eventFormError}</p>}
@@ -444,8 +446,8 @@ export default function App() {
           {organizerAttendeesError && <p className="auth-error" role="alert">{organizerAttendeesError}</p>}
           {organizerRegistrations.length === 0 ? <div className="account-empty">Attendee registrations for your events will appear here.</div> : <div className="registration-list">{organizerRegistrations.map(item => <article className="registration-item" key={item.id}><div><strong>{item.event_title}</strong><span>Attendee ID: <code>{item.user_id}</code></span><small>Registered {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.created_at))}</small><em className={item.status === 'registered' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div></article>)}</div>}
         </div>
-      </section>}
-      {user && <section className="account-section section-wrap" id="my-account">
+      </section> : <section className="route-access section-wrap"><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Organizer access</h2><p>Sign in with an organizer account to create events and manage attendees.</p><button className="primary-button" onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>Sign in</button></section>)}
+      {page === 'account' && (user ? <section className="account-section section-wrap" id="my-account">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">YOUR CAMPUSLY SPACE</div><h2>My <span className="serif-accent">account.</span></h2><p>Manage your profile and keep track of your campus plans.</p></div></div>
         <div className="account-profile">
           <div className="profile-avatar">{(user.user_metadata?.full_name || user.email || 'S').toString().charAt(0).toUpperCase()}</div>
@@ -458,9 +460,11 @@ export default function App() {
             <div><strong>{item.event?.title || 'Event'}</strong><span>{item.event ? `${item.event.category} · ${item.event.venue}, ${item.event.city}` : 'Event details unavailable'}</span><small>{item.event ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(item.event.starts_at)) : ''}</small><em className={item.status === 'registered' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div>
             {item.status === 'registered' && <button className="cancel-registration" disabled={cancelBusy === item.id} onClick={() => handleCancelRegistration(item.id)}>{cancelBusy === item.id ? 'Cancelling…' : 'Cancel registration'}</button>}
           </article>)}</div>}
-      </section>}
+      </section> : <section className="route-access section-wrap"><div className="eyebrow muted-eyebrow">MY ACCOUNT</div><h2>Sign in to view your account</h2><p>Your registrations and account details will be available here after you sign in.</p><button className="primary-button" onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>Sign in</button></section>)}
+      {page === 'events' && <>
       <section className="organizer-section" id="organizers"><div className="organizer-inner"><div className="organizer-icon"><Users size={24}/></div><div className="organizer-copy"><div className="eyebrow light-eyebrow">BUILT FOR THE PEOPLE WHO MAKE IT HAPPEN</div><h2>You bring the idea.<br/><span className="serif-accent">We'll bring the crowd.</span></h2><p>One simple space to publish events, manage registrations and keep your attendee list in order.</p></div><a className="light-button" href="mailto:hello@campusly.in?subject=I%20want%20to%20host%20a%20campus%20event">Become a pilot organizer <ArrowRight size={17}/></a><div className="organizer-decoration"><Ticket size={120}/></div></div></section>
       <section className="how-section section-wrap" id="how-it-works"><div className="section-heading"><div><div className="eyebrow muted-eyebrow">SIMPLE BY DESIGN</div><h2>Three steps. <span className="serif-accent">More campus.</span></h2></div></div><div className="steps-grid"><div className="step"><span>01</span><Compass size={25}/><h3>Discover</h3><p>Find workshops, talks, fests and opportunities worth your time.</p></div><div className="step"><span>02</span><CalendarDays size={25}/><h3>Register</h3><p>Save your spot through a simple event registration experience.</p></div><div className="step"><span>03</span><Users size={25}/><h3>Show up</h3><p>Meet new people, learn something and make the day count.</p></div></div></section>
+      </>}
     </main>
     <footer className="site-footer"><a className="brand footer-brand" href="#"><span className="brand-mark"><GraduationCap size={19}/></span><span>campus<span className="brand-accent">ly</span></span></a><span>Made for campus communities in India.</span><span>© 2026 Campusly · Early preview</span></footer>
     {authOpen && <div className="modal-backdrop" role="presentation" onClick={() => setAuthOpen(false)}>
