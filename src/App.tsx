@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
 import { getPublishedEvents, type EventRecord } from './lib/events'
-import { isSupabaseConfigured } from './lib/supabase'
+import { isSupabaseConfigured, supabase } from './lib/supabase'
+import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
+import type { User } from '@supabase/supabase-js'
 
 const categories = ['All events', 'Workshop', 'Hackathon', 'Talk', 'Cultural', 'Conference', 'Networking']
 type CampusEvent = {
@@ -54,6 +56,15 @@ export default function App() {
   const [events, setEvents] = useState<CampusEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [user, setUser] = useState<User | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const [authMessage, setAuthMessage] = useState('')
 
   useEffect(() => {
     let active = true
@@ -79,6 +90,50 @@ export default function App() {
     return () => { active = false }
   }, [])
 
+  useEffect(() => {
+    if (!supabase) return
+    getCurrentUser().then(setUser).catch(() => setUser(null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setAuthBusy(true)
+    setAuthError('')
+    setAuthMessage('')
+    try {
+      if (authMode === 'signup') {
+        const result = await signUpWithEmail(email.trim(), password, fullName.trim())
+        if (!result.session) {
+          setAuthMessage('Account created. Check your email for a verification link, then sign in.')
+        } else {
+          setAuthMessage('Your account is ready.')
+          setAuthOpen(false)
+        }
+      } else {
+        await signInWithEmail(email.trim(), password)
+        setAuthOpen(false)
+        setPassword('')
+      }
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Authentication failed. Please try again.')
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      await signOut()
+      setUser(null)
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not sign out.')
+    }
+  }
+
   const filtered = useMemo(() => events.filter(event =>
     (activeCategory === 'All events' || event.category.toLowerCase() === activeCategory.toLowerCase()) &&
     (city === 'All cities' || event.city.toLowerCase() === city.toLowerCase()) &&
@@ -98,6 +153,7 @@ export default function App() {
       </nav>
       <div className="header-actions">
         <button className="text-button" onClick={() => document.getElementById('organizers')?.scrollIntoView({ behavior: 'smooth' })}>Host an event</button>
+        {user ? <button className="text-button account-button" onClick={handleSignOut}>Sign out</button> : <button className="text-button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); setAuthOpen(true) }}>Sign in</button>}
         <button className="primary-button header-cta" onClick={goExplore}>Explore events <ArrowRight size={16}/></button>
       </div>
       <button className="mobile-menu-button" aria-label="Toggle navigation" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>{mobileMenuOpen ? <X/> : <Menu/>}</button>
@@ -143,6 +199,26 @@ export default function App() {
       <section className="how-section section-wrap" id="how-it-works"><div className="section-heading"><div><div className="eyebrow muted-eyebrow">SIMPLE BY DESIGN</div><h2>Three steps. <span className="serif-accent">More campus.</span></h2></div></div><div className="steps-grid"><div className="step"><span>01</span><Compass size={25}/><h3>Discover</h3><p>Find workshops, talks, fests and opportunities worth your time.</p></div><div className="step"><span>02</span><CalendarDays size={25}/><h3>Register</h3><p>Save your spot through a simple event registration experience.</p></div><div className="step"><span>03</span><Users size={25}/><h3>Show up</h3><p>Meet new people, learn something and make the day count.</p></div></div></section>
     </main>
     <footer className="site-footer"><a className="brand footer-brand" href="#"><span className="brand-mark"><GraduationCap size={19}/></span><span>campus<span className="brand-accent">ly</span></span></a><span>Made for campus communities in India.</span><span>© 2026 Campusly · Early preview</span></footer>
+    {authOpen && <div className="modal-backdrop" role="presentation" onClick={() => setAuthOpen(false)}>
+      <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" onClick={event => event.stopPropagation()}>
+        <button className="modal-close" onClick={() => setAuthOpen(false)} aria-label="Close"><X size={20}/></button>
+        <div className="auth-modal-content">
+          <div className="eyebrow muted-eyebrow">YOUR CAMPUS COMMUNITY</div>
+          <h2 id="auth-title">{authMode === 'signin' ? 'Welcome back.' : 'Create your account.'}</h2>
+          <p>{authMode === 'signin' ? 'Sign in to continue to Campusly.' : 'Join Campusly with your email address.'}</p>
+          <form className="auth-form" onSubmit={handleAuthSubmit}>
+            {authMode === 'signup' && <label>Full name<input autoComplete="name" required value={fullName} onChange={event => setFullName(event.target.value)} placeholder="Your full name"/></label>}
+            <label>Email address<input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com"/></label>
+            <label>Password<input type="password" autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'} minLength={6} required value={password} onChange={event => setPassword(event.target.value)} placeholder="At least 6 characters"/></label>
+            {authError && <p className="auth-error" role="alert">{authError}</p>}
+            {authMessage && <p className="auth-message" role="status">{authMessage}</p>}
+            <button className="primary-button modal-register" type="submit" disabled={authBusy}>{authBusy ? 'Please wait…' : authMode === 'signin' ? 'Sign in' : 'Create account'} <ArrowRight size={17}/></button>
+          </form>
+          <p className="auth-switch">{authMode === 'signin' ? "New to Campusly?" : 'Already have an account?'} <button type="button" onClick={() => { setAuthMode(authMode === 'signin' ? 'signup' : 'signin'); setAuthError(''); setAuthMessage('') }}>{authMode === 'signin' ? 'Create an account' : 'Sign in'}</button></p>
+          <small className="auth-footnote">Student accounts are created with the standard student role. Organizer access is granted separately.</small>
+        </div>
+      </section>
+    </div>}
     {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}><section className="event-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelectedEvent(null)} aria-label="Close"><X size={20}/></button><img className="modal-image" src={selected.image} alt=""/><div className="modal-content"><div className="event-meta"><span>{selected.category}</span><span className="meta-dot"/> {selected.date}</div><h2 id="modal-title">{selected.title}</h2><div className="modal-detail"><MapPin size={16}/>{selected.venue}, {selected.city}</div><div className="modal-detail"><CalendarDays size={16}/>{selected.time}</div><p>{selected.description}</p><p>Registration will be available once the account and registration experience is enabled.</p><button className="primary-button modal-register" onClick={() => setSelectedEvent(null)}>Got it <ArrowRight size={17}/></button></div></section></div>}
   </div>
 }
