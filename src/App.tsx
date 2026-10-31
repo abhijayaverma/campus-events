@@ -333,7 +333,7 @@ export default function App() {
   const selected = events.find(event => event.id === selectedEvent)
   const goExplore = () => window.location.assign('/events')
 
-  const currentPage = window.location.pathname.replace(/\\/$/, '') || '/'
+  const currentPage = window.location.pathname.replace(/\/$/, '') || '/'
   const page = currentPage === '/admin' ? 'admin' : currentPage === '/organizer' ? 'organizer' : currentPage === '/account' ? 'account' : 'events'
 
   return <div className="app-shell" data-page={page}>
