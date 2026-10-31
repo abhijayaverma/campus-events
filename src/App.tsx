@@ -294,20 +294,21 @@ export default function App() {
     return () => { active = false }
   }, [user, userRole])
 
-  function exportOrganizerAttendees() {
-    if (organizerRegistrations.length === 0) return
+  function exportOrganizerAttendees(filteredOnly = false) {
+    const exportRows = filteredOnly ? filteredOrganizerRegistrations : organizerRegistrations
+    if (exportRows.length === 0) return
     const columns = ['Event', 'Attendee ID', 'Registration status', 'Registered at']
     const escapeCsv = (value: string) => {
       const safe = ['=', '+', '-', '@', '\t', '\r'].some(prefix => value.startsWith(prefix)) ? "'" + value : value
       return '"' + safe.replace(/"/g, '""') + '"'
     }
-    const rows = organizerRegistrations.map(item => [item.event_title, item.user_id, item.status, new Date(item.created_at).toISOString()])
+    const rows = exportRows.map(item => [item.event_title, item.user_id, item.status, new Date(item.created_at).toISOString()])
     const csv = [columns, ...rows].map(row => row.map(value => escapeCsv(String(value))).join(',')).join(String.fromCharCode(13, 10))
     const blob = new Blob([String.fromCharCode(65279), csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'campusly-attendees-' + new Date().toISOString().slice(0, 10) + '.csv'
+    link.download = 'campusly-attendees' + (filteredOnly ? '-filtered' : '') + '-' + new Date().toISOString().slice(0, 10) + '.csv'
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -597,7 +598,7 @@ export default function App() {
           })}</div>}
         </div>
         <div className="organizer-attendees">
-          <div className="account-list-heading"><h3>Event attendees</h3><span>{organizerRegistrations.filter(item => item.status === 'registered').length} active registrations</span><button className="cancel-registration" type="button" disabled={organizerRegistrations.length === 0} onClick={exportOrganizerAttendees}>Export CSV</button></div>
+          <div className="account-list-heading"><h3>Event attendees</h3><span>{organizerRegistrations.filter(item => item.status === 'registered').length} active registrations</span><button className="cancel-registration" type="button" disabled={organizerRegistrations.length === 0} onClick={() => exportOrganizerAttendees(false)}>Export all</button><button className="cancel-registration" type="button" disabled={filteredOrganizerRegistrations.length === 0} onClick={() => exportOrganizerAttendees(true)}>Export filtered ({filteredOrganizerRegistrations.length})</button></div>
           {organizerAttendeesError && <p className="auth-error" role="alert">{organizerAttendeesError}</p>}
           {organizerRegistrations.length > 0 && <div className="filter-row"><input aria-label="Search attendees" placeholder="Search event or attendee ID…" value={organizerAttendeeQuery} onChange={event => setOrganizerAttendeeQuery(event.target.value)}/><select aria-label="Filter registration status" value={organizerAttendeeStatus} onChange={event => setOrganizerAttendeeStatus(event.target.value)}><option value="all">All statuses</option><option value="registered">Registered</option><option value="cancelled">Cancelled</option><option value="attended">Attended</option></select></div>}
           {organizerRegistrations.length === 0 ? <div className="account-empty">Attendee registrations for your events will appear here.</div> : filteredOrganizerRegistrations.length === 0 ? <div className="account-empty">No attendees match your search or status filter.</div> : <div className="registration-list">{filteredOrganizerRegistrations.map(item => <article className="registration-item" key={item.id}><div><strong>{item.event_title}</strong><span>Attendee ID: <code>{item.user_id}</code></span><small>Registered {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.created_at))}</small><em className={item.status === 'registered' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div></article>)}</div>}
