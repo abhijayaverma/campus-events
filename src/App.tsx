@@ -94,6 +94,8 @@ export default function App() {
   const [adminEvents, setAdminEvents] = useState<EventRecord[]>([])
   const [adminRegistrations, setAdminRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string}>>([])
   const [organizerEvents, setOrganizerEvents] = useState<EventRecord[]>([])
+  const [organizerEventQuery, setOrganizerEventQuery] = useState('')
+  const [organizerEventStatus, setOrganizerEventStatus] = useState('all')
   const [organizerRegistrations, setOrganizerRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string;event_title:string}>>([])
   const [organizerAttendeesError, setOrganizerAttendeesError] = useState('')
   const [organizerAttendeeQuery, setOrganizerAttendeeQuery] = useState('')
@@ -279,6 +281,12 @@ export default function App() {
     loadAdminEvents()
     return () => { active = false }
   }, [user, userRole])
+
+  const filteredOrganizerEvents = organizerEvents.filter(item => {
+    const query = organizerEventQuery.trim().toLowerCase()
+    const matchesQuery = !query || `${item.title} ${item.category} ${item.venue} ${item.city}`.toLowerCase().includes(query)
+    return matchesQuery && (organizerEventStatus === 'all' || item.status === organizerEventStatus)
+  })
 
   const filteredOrganizerRegistrations = organizerRegistrations.filter(item => {
     const query = organizerAttendeeQuery.trim().toLowerCase()
@@ -669,7 +677,7 @@ export default function App() {
         </form>}
         <div className="organizer-attendees">
           <div className="account-list-heading"><h3>My events</h3><span>{organizerEvents.length} submitted</span></div>
-          {organizerEvents.length === 0 ? <div className="account-empty">Events you submit will appear here with their review status.</div> : <div className="registration-list">{organizerEvents.map(item => {
+          {organizerEvents.length > 0 && <div className="filter-row"><input aria-label="Search my events" placeholder="Search my events by title, venue or city…" value={organizerEventQuery} onChange={event => setOrganizerEventQuery(event.target.value)}/><select aria-label="Filter my event status" value={organizerEventStatus} onChange={event => setOrganizerEventStatus(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="published">Published</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option><option value="completed">Completed</option><option value="draft">Draft</option></select><span>{filteredOrganizerEvents.length} of {organizerEvents.length}</span></div>}{organizerEvents.length === 0 ? <div className="account-empty">Events you submit will appear here with their review status.</div> : filteredOrganizerEvents.length === 0 ? <div className="account-empty">No events match your search or status filter.</div> : <div className="registration-list">{filteredOrganizerEvents.map(item => {
             const activeCount = organizerRegistrations.filter(registration => registration.event_id === item.id && registration.status === 'registered').length
             const capacityPercent = item.capacity && item.capacity > 0 ? Math.min(100, Math.round(activeCount / item.capacity * 100)) : null
             const remainingSeats = item.capacity !== null ? Math.max(0, item.capacity - activeCount) : null
