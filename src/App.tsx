@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { getPublishedEvents, registerForEvent, type EventRecord } from './lib/events'
+import { cancelRegistration, getMyRegistrations, getPublishedEvents, registerForEvent, type EventRecord } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -68,6 +68,10 @@ export default function App() {
   const [registrationBusy, setRegistrationBusy] = useState(false)
   const [registrationMessage, setRegistrationMessage] = useState('')
   const [registrationError, setRegistrationError] = useState('')
+  const [myRegistrations, setMyRegistrations] = useState<Array<{id:string;status:string;event: {id:string;title:string;category:string;venue:string;city:string;starts_at:string;ends_at:string;status:string} | null}>>([])
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardError, setDashboardError] = useState('')
+  const [cancelBusy, setCancelBusy] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -162,6 +166,41 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    let active = true
+    async function loadMyRegistrations() {
+      if (!user) {
+        setMyRegistrations([])
+        return
+      }
+      setDashboardLoading(true)
+      setDashboardError('')
+      try {
+        const registrations = await getMyRegistrations()
+        if (active) setMyRegistrations(registrations as typeof myRegistrations)
+      } catch (error) {
+        if (active) setDashboardError(error instanceof Error ? error.message : 'Could not load your registrations.')
+      } finally {
+        if (active) setDashboardLoading(false)
+      }
+    }
+    loadMyRegistrations()
+    return () => { active = false }
+  }, [user])
+
+  async function handleCancelRegistration(registrationId: string) {
+    setCancelBusy(registrationId)
+    setDashboardError('')
+    try {
+      await cancelRegistration(registrationId)
+      setMyRegistrations(current => current.map(item => item.id === registrationId ? { ...item, status: 'cancelled' } : item))
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : 'Could not cancel this registration.')
+    } finally {
+      setCancelBusy(null)
+    }
+  }
+
   const filtered = useMemo(() => events.filter(event =>
     (activeCategory === 'All events' || event.category.toLowerCase() === activeCategory.toLowerCase()) &&
     (city === 'All cities' || event.city.toLowerCase() === city.toLowerCase()) &&
@@ -181,7 +220,7 @@ export default function App() {
       </nav>
       <div className="header-actions">
         <button className="text-button" onClick={() => document.getElementById('organizers')?.scrollIntoView({ behavior: 'smooth' })}>Host an event</button>
-        {user ? <button className="text-button account-button" onClick={handleSignOut}>Sign out</button> : <button className="text-button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); setAuthOpen(true) }}>Sign in</button>}
+        {user ? <><button className="text-button account-button" onClick={() => document.getElementById('my-account')?.scrollIntoView({ behavior: 'smooth' })}>My account</button><button className="text-button account-button" onClick={handleSignOut}>Sign out</button></> : <button className="text-button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); setAuthOpen(true) }}>Sign in</button>}
         <button className="primary-button header-cta" onClick={goExplore}>Explore events <ArrowRight size={16}/></button>
       </div>
       <button className="mobile-menu-button" aria-label="Toggle navigation" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>{mobileMenuOpen ? <X/> : <Menu/>}</button>
@@ -223,6 +262,20 @@ export default function App() {
           {!loading && filtered.length === 0 && <div className="empty-state"><Search size={28}/><h3>{loadError ? 'Events could not be loaded' : 'No published events yet'}</h3><p>{loadError || 'There are no published events matching your filters. Check back soon or try another city.'}</p><button className="text-button" onClick={() => { setQuery(''); setActiveCategory('All events'); setCity('All cities') }}>Clear filters</button></div>}
         </div>
       </section>
+      {user && <section className="account-section section-wrap" id="my-account">
+        <div className="section-heading"><div><div className="eyebrow muted-eyebrow">YOUR CAMPUSLY SPACE</div><h2>My <span className="serif-accent">account.</span></h2><p>Manage your profile and keep track of your campus plans.</p></div></div>
+        <div className="account-profile">
+          <div className="profile-avatar">{(user.user_metadata?.full_name || user.email || 'S').toString().charAt(0).toUpperCase()}</div>
+          <div><strong>{user.user_metadata?.full_name || 'Campusly student'}</strong><span>{user.email}</span><small>Student account</small></div>
+        </div>
+        <div className="account-list-heading"><h3>My registrations</h3><span>{myRegistrations.filter(item => item.status === 'registered').length} active</span></div>
+        {dashboardError && <p className="auth-error" role="alert">{dashboardError}</p>}
+        {dashboardLoading ? <p className="account-empty">Loading your registrations…</p> : myRegistrations.length === 0 ? <div className="account-empty">You haven't registered for any events yet. Explore events above to get started.</div> :
+          <div className="registration-list">{myRegistrations.map(item => <article className="registration-item" key={item.id}>
+            <div><strong>{item.event?.title || 'Event'}</strong><span>{item.event ? `${item.event.category} · ${item.event.venue}, ${item.event.city}` : 'Event details unavailable'}</span><small>{item.event ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(item.event.starts_at)) : ''}</small><em className={item.status === 'registered' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div>
+            {item.status === 'registered' && <button className="cancel-registration" disabled={cancelBusy === item.id} onClick={() => handleCancelRegistration(item.id)}>{cancelBusy === item.id ? 'Cancelling…' : 'Cancel registration'}</button>}
+          </article>)}</div>}
+      </section>}
       <section className="organizer-section" id="organizers"><div className="organizer-inner"><div className="organizer-icon"><Users size={24}/></div><div className="organizer-copy"><div className="eyebrow light-eyebrow">BUILT FOR THE PEOPLE WHO MAKE IT HAPPEN</div><h2>You bring the idea.<br/><span className="serif-accent">We'll bring the crowd.</span></h2><p>One simple space to publish events, manage registrations and keep your attendee list in order.</p></div><a className="light-button" href="mailto:hello@campusly.in?subject=I%20want%20to%20host%20a%20campus%20event">Become a pilot organizer <ArrowRight size={17}/></a><div className="organizer-decoration"><Ticket size={120}/></div></div></section>
       <section className="how-section section-wrap" id="how-it-works"><div className="section-heading"><div><div className="eyebrow muted-eyebrow">SIMPLE BY DESIGN</div><h2>Three steps. <span className="serif-accent">More campus.</span></h2></div></div><div className="steps-grid"><div className="step"><span>01</span><Compass size={25}/><h3>Discover</h3><p>Find workshops, talks, fests and opportunities worth your time.</p></div><div className="step"><span>02</span><CalendarDays size={25}/><h3>Register</h3><p>Save your spot through a simple event registration experience.</p></div><div className="step"><span>03</span><Users size={25}/><h3>Show up</h3><p>Meet new people, learn something and make the day count.</p></div></div></section>
     </main>
