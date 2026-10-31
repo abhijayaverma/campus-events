@@ -367,7 +367,7 @@ export default function App() {
       await createEvent(payload)
       setOrganizerEvents(await getOrganizerEvents())
       setEventFormMessage('Event submitted for review. It will appear publicly after approval.')
-      setNewEvent({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
+      setNewEvent({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', registration_deadline:'', cover_image_url:'', capacity:'' })
       setEventFormOpen(false)
     } catch (error) {
       const detail = error as { message?: string; details?: string; hint?: string; code?: string }
