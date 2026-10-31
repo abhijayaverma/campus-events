@@ -48,6 +48,20 @@ export async function getAdminEvents() {
   return (data ?? []) as EventRecord[]
 }
 
+export async function getOrganizerRegistrations() {
+  const client = requireSupabase()
+  const { data: { user }, error: userError } = await client.auth.getUser()
+  if (userError) throw userError
+  if (!user) throw new Error('Sign in to view event registrations.')
+  const { data: ownedEvents, error: eventsError } = await client.from('events').select('id,title').eq('organizer_id', user.id)
+  if (eventsError) throw eventsError
+  const eventIds = (ownedEvents ?? []).map(event => event.id)
+  if (eventIds.length === 0) return []
+  const { data, error } = await client.from('registrations').select('id,event_id,user_id,status,created_at').in('event_id', eventIds).order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(registration => ({ ...registration, event_title: ownedEvents?.find(event => event.id === registration.event_id)?.title ?? 'Event' }))
+}
+
 export async function getAdminRegistrations() {
   const { data, error } = await requireSupabase().from('registrations')
     .select('id,event_id,user_id,status,created_at')
