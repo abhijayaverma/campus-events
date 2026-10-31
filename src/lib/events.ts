@@ -141,3 +141,11 @@ export async function getSavedEventIds() {
   if (error) throw error
   return (data ?? []).map(item => item.event_id as string)
 }
+
+export async function markRegistrationAttended(registrationId: string) {
+  const { data, error } = await requireSupabase().from('registrations')
+    .update({ status: 'attended' }).eq('id', registrationId).eq('status', 'registered')
+    .select('id,status').single()
+  if (error) throw error
+  return data
+}
