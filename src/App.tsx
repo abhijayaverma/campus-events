@@ -53,6 +53,7 @@ export default function App() {
   const [city, setCity] = useState('All cities')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
+  const [shareMessage, setShareMessage] = useState('')
   const [events, setEvents] = useState<CampusEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -417,6 +418,35 @@ export default function App() {
   }, [events, activeCategory, query, city])
   const featured = filtered[0]
   const selected = events.find(event => event.id === selectedEvent)
+
+  useEffect(() => {
+    const sharedEventId = new URLSearchParams(window.location.search).get('event')
+    if (sharedEventId && events.some(event => event.id === sharedEventId)) setSelectedEvent(sharedEventId)
+  }, [events])
+
+  async function handleShareEvent() {
+    if (!selected) return
+    const url = new URL('/events', window.location.origin)
+    url.searchParams.set('event', selected.id)
+    const shareData = { title: selected.title, text: `Join me at ${selected.title} on Campusly.`, url: url.toString() }
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+        setShareMessage('Event shared.')
+      } else {
+        await navigator.clipboard.writeText(url.toString())
+        setShareMessage('Event link copied to clipboard.')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      try {
+        await navigator.clipboard.writeText(url.toString())
+        setShareMessage('Event link copied to clipboard.')
+      } catch {
+        setShareMessage('Could not share this event from your browser.')
+      }
+    }
+  }
   const goExplore = () => window.location.assign('/events')
 
   const currentPage = window.location.pathname.replace(/\/$/, '') || '/'
@@ -464,13 +494,13 @@ export default function App() {
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">FIND YOUR NEXT EXPERIENCE</div><h2>What's happening <span className="serif-accent">around you?</span></h2><p>Good things happen when you step out of the classroom.</p></div><a className="subtle-link" href="#all-events">Explore the calendar <ArrowRight size={16}/></a></div>
         {featured && <div className="featured-event">
           <div className="featured-image"><img src={featured.image} alt=""/><span className="featured-label"><Sparkles size={13}/>FEATURED EVENT</span></div>
-          <div className="featured-content"><div className="event-meta"><span>{featured.category}</span><span className="meta-dot"/> {featured.date}</div><h3>{featured.title}</h3><p>{featured.description}</p><div className="featured-details"><span><MapPin size={15}/>{featured.venue}, {featured.city}</span><span><CalendarDays size={15}/>{featured.time}</span></div><div className="featured-footer"><span className="free-tag">{featured.price}</span><button className="dark-button" onClick={() => setSelectedEvent(featured.id)}>View event <ArrowRight size={16}/></button></div></div>
+          <div className="featured-content"><div className="event-meta"><span>{featured.category}</span><span className="meta-dot"/> {featured.date}</div><h3>{featured.title}</h3><p>{featured.description}</p><div className="featured-details"><span><MapPin size={15}/>{featured.venue}, {featured.city}</span><span><CalendarDays size={15}/>{featured.time}</span></div><div className="featured-footer"><span className="free-tag">{featured.price}</span><button className="dark-button" onClick={() => { setSelectedEvent(featured.id); setShareMessage('') }}>View event <ArrowRight size={16}/></button></div></div>
         </div>}
         <div className="section-heading events-heading" id="all-events"><div><div className="eyebrow muted-eyebrow">THE CAMPUS CALENDAR</div><h2>Explore <span className="serif-accent">events.</span></h2></div><span className="result-count">{loading ? 'Loading events…' : `${filtered.length} ${filtered.length === 1 ? 'event' : 'events'} in ${city === 'All cities' ? 'all cities' : city}`}</span></div>
         <div className="filter-row" role="tablist" aria-label="Filter events by category">{categories.map(category => <button key={category} role="tab" aria-selected={activeCategory === category} className={activeCategory === category ? 'filter-chip selected' : 'filter-chip'} onClick={() => setActiveCategory(category)}>{category}</button>)}</div>
         <div className="event-grid">
           {filtered.map(event => <article className="event-card" key={event.id}>
-            <button className="event-image-button" onClick={() => setSelectedEvent(event.id)} aria-label={`View ${event.title}`}><img src={event.image} alt=""/><span className="date-badge"><strong>{event.day}</strong><small>{event.month}</small></span></button>
+            <button className="event-image-button" onClick={() => { setSelectedEvent(event.id); setShareMessage('') }} aria-label={`View ${event.title}`}><img src={event.image} alt=""/><span className="date-badge"><strong>{event.day}</strong><small>{event.month}</small></span></button>
             <div className="event-card-body"><div className="event-meta"><span>{event.category}</span><span className="meta-dot"/> {event.time}</div><h3><button className="event-title-button" onClick={() => setSelectedEvent(event.id)}>{event.title}</button></h3><div className="card-location"><MapPin size={14}/>{event.venue}, {event.city}</div><div className="event-card-footer"><span className="free-tag">{event.price}</span><div className="event-card-actions"><button className={savedEventIds.includes(event.id) ? 'round-arrow saved-event-button' : 'round-arrow saved-event-button'} aria-label={savedEventIds.includes(event.id) ? 'Remove saved event' : 'Save event'} title={savedEventIds.includes(event.id) ? 'Remove saved event' : 'Save event'} disabled={savedBusy === event.id} onClick={() => handleToggleSaved(event.id)}><Bookmark size={16} fill={savedEventIds.includes(event.id) ? 'currentColor' : 'none'}/></button><button className="round-arrow" aria-label={`View ${event.title}`} onClick={() => setSelectedEvent(event.id)}><ArrowRight size={17}/></button></div></div></div>
           </article>)}
           {!loading && filtered.length === 0 && <div className="empty-state"><Search size={28}/><h3>{loadError ? 'Events could not be loaded' : 'No published events yet'}</h3><p>{loadError || 'There are no published events matching your filters. Check back soon or try another city.'}</p><button className="text-button" onClick={() => { setQuery(''); setActiveCategory('All events'); setCity('All cities') }}>Clear filters</button></div>}
@@ -595,6 +625,8 @@ export default function App() {
       </section>
     </div>}
     {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}><section className="event-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelectedEvent(null)} aria-label="Close"><X size={20}/></button><img className="modal-image" src={selected.image} alt=""/><div className="modal-content"><div className="event-meta"><span>{selected.category}</span><span className="meta-dot"/> {selected.date}</div><h2 id="modal-title">{selected.title}</h2><div className="modal-detail"><MapPin size={16}/>{selected.venue}, {selected.city}</div><div className="modal-detail"><CalendarDays size={16}/>{selected.time}</div><p>{selected.description}</p>
+          <button className="cancel-registration save-modal-button" onClick={handleShareEvent}><ArrowRight size={15}/> Share event</button>
+          {shareMessage && <p className="auth-message" role="status">{shareMessage}</p>}
           <button className="cancel-registration save-modal-button" disabled={savedBusy === selected.id} onClick={() => handleToggleSaved(selected.id)}><Bookmark size={15} fill={savedEventIds.includes(selected.id) ? 'currentColor' : 'none'}/> {savedEventIds.includes(selected.id) ? 'Saved to your account' : 'Save this event'}</button>
           {registrationError && <p className="auth-error" role="alert">{registrationError}</p>}
           {registrationMessage && <p className="auth-message" role="status">{registrationMessage}</p>}
