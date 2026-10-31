@@ -13,7 +13,7 @@ export type EventRecord = {
   cover_image_url: string | null
   capacity: number | null
   registration_deadline: string | null
-  status: 'draft' | 'pending' | 'published' | 'cancelled' | 'completed'
+  status: 'draft' | 'pending' | 'published' | 'cancelled' | 'completed' | 'rejected'
   created_at: string
 }
 
@@ -36,6 +36,21 @@ export async function createEvent(input: NewEvent) {
   if (!user) throw new Error('Sign in before creating an event.')
   const { data, error } = await client.from('events')
     .insert({ ...input, organizer_id: user.id }).select().single()
+  if (error) throw error
+  return data as EventRecord
+}
+
+
+export async function getAdminEvents() {
+  const { data, error } = await requireSupabase().from('events').select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as EventRecord[]
+}
+
+export async function setAdminEventStatus(eventId: string, status: EventRecord['status']) {
+  const { data, error } = await requireSupabase().from('events')
+    .update({ status }).eq('id', eventId).select().single()
   if (error) throw error
   return data as EventRecord
 }
