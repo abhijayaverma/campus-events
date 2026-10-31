@@ -48,6 +48,13 @@ export async function getAdminEvents() {
   return (data ?? []) as EventRecord[]
 }
 
+export async function getAdminRegistrations() {
+  const { data, error } = await requireSupabase().from('registrations')
+    .select('id,event_id,user_id,status,created_at')
+  if (error) throw error
+  return data ?? []
+}
+
 export async function setAdminEventStatus(eventId: string, status: EventRecord['status']) {
   const { data, error } = await requireSupabase().from('events')
     .update({ status }).eq('id', eventId).select().single()
