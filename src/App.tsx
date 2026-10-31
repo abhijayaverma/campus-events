@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, registerForEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
+import { ArrowRight, Bookmark, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
+import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, getSavedEventIds, registerForEvent, saveEvent, unsaveEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -68,6 +68,8 @@ export default function App() {
   const [registrationBusy, setRegistrationBusy] = useState(false)
   const [registrationMessage, setRegistrationMessage] = useState('')
   const [registrationError, setRegistrationError] = useState('')
+  const [savedEventIds, setSavedEventIds] = useState<string[]>([])
+  const [savedBusy, setSavedBusy] = useState<string | null>(null)
   const [myRegistrations, setMyRegistrations] = useState<Array<{id:string;status:string;event: {id:string;title:string;category:string;venue:string;city:string;starts_at:string;ends_at:string;status:string} | null}>>([])
   const [dashboardLoading, setDashboardLoading] = useState(false)
   const [dashboardError, setDashboardError] = useState('')
@@ -287,6 +289,44 @@ export default function App() {
 
   useEffect(() => {
     let active = true
+    async function loadSavedEvents() {
+      if (!user) { setSavedEventIds([]); return }
+      try {
+        const ids = await getSavedEventIds()
+        if (active) setSavedEventIds(ids)
+      } catch (error) {
+        console.error('Could not load saved events', error)
+      }
+    }
+    loadSavedEvents()
+    return () => { active = false }
+  }, [user])
+
+  async function handleToggleSaved(eventId: string) {
+    if (!user) {
+      setAuthMode('signin')
+      setAuthMessage('Sign in to save events to your account.')
+      setAuthOpen(true)
+      return
+    }
+    setSavedBusy(eventId)
+    try {
+      if (savedEventIds.includes(eventId)) {
+        await unsaveEvent(eventId)
+        setSavedEventIds(ids => ids.filter(id => id !== eventId))
+      } else {
+        await saveEvent(eventId)
+        setSavedEventIds(ids => [...ids, eventId])
+      }
+    } catch (error) {
+      setRegistrationError(error instanceof Error ? error.message : 'Could not update saved events.')
+    } finally {
+      setSavedBusy(null)
+    }
+  }
+
+  useEffect(() => {
+    let active = true
     async function loadMyRegistrations() {
       if (!user) {
         setMyRegistrations([])
@@ -393,7 +433,7 @@ export default function App() {
         <div className="event-grid">
           {filtered.map(event => <article className="event-card" key={event.id}>
             <button className="event-image-button" onClick={() => setSelectedEvent(event.id)} aria-label={`View ${event.title}`}><img src={event.image} alt=""/><span className="date-badge"><strong>{event.day}</strong><small>{event.month}</small></span></button>
-            <div className="event-card-body"><div className="event-meta"><span>{event.category}</span><span className="meta-dot"/> {event.time}</div><h3><button className="event-title-button" onClick={() => setSelectedEvent(event.id)}>{event.title}</button></h3><div className="card-location"><MapPin size={14}/>{event.venue}, {event.city}</div><div className="event-card-footer"><span className="free-tag">{event.price}</span><button className="round-arrow" aria-label={`View ${event.title}`} onClick={() => setSelectedEvent(event.id)}><ArrowRight size={17}/></button></div></div>
+            <div className="event-card-body"><div className="event-meta"><span>{event.category}</span><span className="meta-dot"/> {event.time}</div><h3><button className="event-title-button" onClick={() => setSelectedEvent(event.id)}>{event.title}</button></h3><div className="card-location"><MapPin size={14}/>{event.venue}, {event.city}</div><div className="event-card-footer"><span className="free-tag">{event.price}</span><div className="event-card-actions"><button className={savedEventIds.includes(event.id) ? 'round-arrow saved-event-button' : 'round-arrow saved-event-button'} aria-label={savedEventIds.includes(event.id) ? 'Remove saved event' : 'Save event'} title={savedEventIds.includes(event.id) ? 'Remove saved event' : 'Save event'} disabled={savedBusy === event.id} onClick={() => handleToggleSaved(event.id)}><Bookmark size={16} fill={savedEventIds.includes(event.id) ? 'currentColor' : 'none'}/></button><button className="round-arrow" aria-label={`View ${event.title}`} onClick={() => setSelectedEvent(event.id)}><ArrowRight size={17}/></button></div></div></div>
           </article>)}
           {!loading && filtered.length === 0 && <div className="empty-state"><Search size={28}/><h3>{loadError ? 'Events could not be loaded' : 'No published events yet'}</h3><p>{loadError || 'There are no published events matching your filters. Check back soon or try another city.'}</p><button className="text-button" onClick={() => { setQuery(''); setActiveCategory('All events'); setCity('All cities') }}>Clear filters</button></div>}
         </div>
@@ -461,6 +501,8 @@ export default function App() {
           <div className="profile-avatar">{(user.user_metadata?.full_name || user.email || 'S').toString().charAt(0).toUpperCase()}</div>
           <div><strong>{user.user_metadata?.full_name || 'Campusly student'}</strong><span>{user.email}</span><small>Student account</small></div>
         </div>
+        <div className="account-list-heading"><h3>Saved events</h3><span>{savedEventIds.length} saved</span></div>
+        {savedEventIds.length === 0 ? <div className="account-empty">Save events from Discover and they will appear here.</div> : <div className="registration-list">{events.filter(item => savedEventIds.includes(item.id)).map(item => <article className="registration-item" key={item.id}><div><strong>{item.title}</strong><span>{item.category} · {item.venue}, {item.city}</span><small>{item.date} · {item.time}</small></div><button className="cancel-registration" disabled={savedBusy === item.id} onClick={() => handleToggleSaved(item.id)}>Remove saved event</button></article>)}</div>}
         <div className="account-list-heading"><h3>My registrations</h3><span>{myRegistrations.filter(item => item.status === 'registered').length} active</span></div>
         {dashboardError && <p className="auth-error" role="alert">{dashboardError}</p>}
         {dashboardLoading ? <p className="account-empty">Loading your registrations…</p> : myRegistrations.length === 0 ? <div className="account-empty">You haven't registered for any events yet. Explore events above to get started.</div> :
@@ -496,6 +538,7 @@ export default function App() {
       </section>
     </div>}
     {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}><section className="event-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelectedEvent(null)} aria-label="Close"><X size={20}/></button><img className="modal-image" src={selected.image} alt=""/><div className="modal-content"><div className="event-meta"><span>{selected.category}</span><span className="meta-dot"/> {selected.date}</div><h2 id="modal-title">{selected.title}</h2><div className="modal-detail"><MapPin size={16}/>{selected.venue}, {selected.city}</div><div className="modal-detail"><CalendarDays size={16}/>{selected.time}</div><p>{selected.description}</p>
+          <button className="cancel-registration save-modal-button" disabled={savedBusy === selected.id} onClick={() => handleToggleSaved(selected.id)}><Bookmark size={15} fill={savedEventIds.includes(selected.id) ? 'currentColor' : 'none'}/> {savedEventIds.includes(selected.id) ? 'Saved to your account' : 'Save this event'}</button>
           {registrationError && <p className="auth-error" role="alert">{registrationError}</p>}
           {registrationMessage && <p className="auth-message" role="status">{registrationMessage}</p>}
           <button className="primary-button modal-register" onClick={handleRegister} disabled={registrationBusy || Boolean(registrationMessage)}>{registrationBusy ? 'Registering…' : registrationMessage ? 'Registered' : user ? 'Register for event' : 'Sign in to register'} <ArrowRight size={17}/></button>
