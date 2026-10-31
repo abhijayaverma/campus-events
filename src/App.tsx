@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, Bookmark, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { cancelRegistration, createEvent, updateOrganizerEvent, getAdminEvents, getAdminRegistrations, getOrganizerEvents, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, getSavedEventIds, markRegistrationAttended, registerForEvent, saveEvent, unsaveEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
+import { cancelRegistration, createEvent, updateOrganizerEvent, cancelOrganizerEvent, getAdminEvents, getAdminRegistrations, getOrganizerEvents, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, getSavedEventIds, markRegistrationAttended, registerForEvent, saveEvent, unsaveEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, resetPasswordWithEmail, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -324,6 +324,22 @@ export default function App() {
     loadOrganizerRegistrations()
     return () => { active = false }
   }, [user, userRole])
+
+  async function handleOrganizerCancelEvent(eventId: string) {
+    if (!window.confirm('Cancel this event? It will be removed from public discovery. Existing registrations will remain recorded.')) return
+    setEventSaving(true)
+    setOrganizerAttendeesError('')
+    try {
+      const updated = await cancelOrganizerEvent(eventId)
+      setOrganizerEvents(current => current.map(item => item.id === eventId ? updated : item))
+      setEvents(current => current.filter(item => item.id !== eventId))
+      if (selectedEvent === eventId) setSelectedEvent(null)
+    } catch (error) {
+      setOrganizerAttendeesError(error instanceof Error ? error.message : 'Could not cancel this event.')
+    } finally {
+      setEventSaving(false)
+    }
+  }
 
   async function handleMarkAttended(registrationId: string) {
     setAttendeeCheckInBusy(registrationId)
@@ -657,7 +673,7 @@ export default function App() {
             const activeCount = organizerRegistrations.filter(registration => registration.event_id === item.id && registration.status === 'registered').length
             const capacityPercent = item.capacity && item.capacity > 0 ? Math.min(100, Math.round(activeCount / item.capacity * 100)) : null
             const remainingSeats = item.capacity !== null ? Math.max(0, item.capacity - activeCount) : null
-            return <article className="registration-item" key={item.id}><div><strong>{item.title}</strong><span>{item.category} · {item.venue}, {item.city}</span><small>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.starts_at))} · {activeCount} active registrations</small>{item.capacity !== null && <div className="organizer-capacity"><div className="organizer-capacity-label"><span>{activeCount} / {item.capacity} seats filled</span><span>{remainingSeats === 0 ? 'Full' : remainingSeats + ' remaining'}</span></div><div className="organizer-capacity-track" role="progressbar" aria-label={item.title + ' registration capacity'} aria-valuemin={0} aria-valuemax={item.capacity} aria-valuenow={Math.min(activeCount, item.capacity)}><span style={{width: capacityPercent + '%'}}/></div></div>}{item.registration_deadline && <small>Registration deadline: {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.registration_deadline))}</small>}<em className={item.status === 'published' ? 'registration-status active' : 'registration-status'}>{item.status}</em><button className="cancel-registration" type="button" onClick={() => { setEditingEventId(item.id); setNewEvent({ title:item.title, description:item.description, category:item.category, venue:item.venue, city:item.city, starts_at:new Date(item.starts_at).toISOString().slice(0,16), ends_at:new Date(item.ends_at).toISOString().slice(0,16), registration_deadline:item.registration_deadline ? new Date(item.registration_deadline).toISOString().slice(0,16) : '', cover_image_url:item.cover_image_url || '', capacity:item.capacity === null ? '' : String(item.capacity) }); setEventFormOpen(true); setEventFormError(''); setEventFormMessage('') }}>Edit event</button></div></article>
+            return <article className="registration-item" key={item.id}><div><strong>{item.title}</strong><span>{item.category} · {item.venue}, {item.city}</span><small>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.starts_at))} · {activeCount} active registrations</small>{item.capacity !== null && <div className="organizer-capacity"><div className="organizer-capacity-label"><span>{activeCount} / {item.capacity} seats filled</span><span>{remainingSeats === 0 ? 'Full' : remainingSeats + ' remaining'}</span></div><div className="organizer-capacity-track" role="progressbar" aria-label={item.title + ' registration capacity'} aria-valuemin={0} aria-valuemax={item.capacity} aria-valuenow={Math.min(activeCount, item.capacity)}><span style={{width: capacityPercent + '%'}}/></div></div>}{item.registration_deadline && <small>Registration deadline: {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.registration_deadline))}</small>}<em className={item.status === 'published' ? 'registration-status active' : 'registration-status'}>{item.status}</em><button className="cancel-registration" type="button" onClick={() => { setEditingEventId(item.id); setNewEvent({ title:item.title, description:item.description, category:item.category, venue:item.venue, city:item.city, starts_at:new Date(item.starts_at).toISOString().slice(0,16), ends_at:new Date(item.ends_at).toISOString().slice(0,16), registration_deadline:item.registration_deadline ? new Date(item.registration_deadline).toISOString().slice(0,16) : '', cover_image_url:item.cover_image_url || '', capacity:item.capacity === null ? '' : String(item.capacity) }); setEventFormOpen(true); setEventFormError(''); setEventFormMessage('') }}>Edit event</button>{!['cancelled','completed'].includes(item.status) && <button className="cancel-registration" type="button" disabled={eventSaving} onClick={() => handleOrganizerCancelEvent(item.id)}>Cancel event</button>}</div></article>
           })}</div>}
         </div>
         <div className="organizer-attendees">
