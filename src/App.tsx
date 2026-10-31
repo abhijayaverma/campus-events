@@ -206,7 +206,10 @@ export default function App() {
       setNewEvent({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
       setEventFormOpen(false)
     } catch (error) {
-      setEventFormError(error instanceof Error ? error.message : 'Could not submit event.')
+      const detail = error as { message?: string; details?: string; hint?: string; code?: string }
+      const parts = [detail?.message, detail?.details, detail?.hint, detail?.code ? `Code: ${detail.code}` : '']
+        .filter(Boolean)
+      setEventFormError(parts.join(' · ') || 'Could not submit event. Please check the event details and try again.')
     } finally {
       setEventSaving(false)
     }
