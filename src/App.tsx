@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, Bookmark, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getOrganizerEvents, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, getSavedEventIds, markRegistrationAttended, registerForEvent, saveEvent, unsaveEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
+import { cancelRegistration, createEvent, updateOrganizerEvent, getAdminEvents, getAdminRegistrations, getOrganizerEvents, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, getSavedEventIds, markRegistrationAttended, registerForEvent, saveEvent, unsaveEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, resetPasswordWithEmail, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -86,6 +86,7 @@ export default function App() {
   const [profileMessage, setProfileMessage] = useState('')
   const [profileError, setProfileError] = useState('')
   const [eventFormOpen, setEventFormOpen] = useState(false)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [eventSaving, setEventSaving] = useState(false)
   const [eventFormError, setEventFormError] = useState('')
   const [eventFormMessage, setEventFormMessage] = useState('')
@@ -393,9 +394,16 @@ export default function App() {
         capacity: newEvent.capacity ? Number(newEvent.capacity) : undefined,
         status: 'pending',
       }
-      await createEvent(payload)
-      setOrganizerEvents(await getOrganizerEvents())
-      setEventFormMessage('Event submitted for review. It will appear publicly after approval.')
+      if (editingEventId) {
+        const updated = await updateOrganizerEvent(editingEventId, payload)
+        setOrganizerEvents(current => current.map(item => item.id === editingEventId ? updated : item))
+        setEventFormMessage('Event details updated successfully.')
+      } else {
+        await createEvent(payload)
+        setOrganizerEvents(await getOrganizerEvents())
+        setEventFormMessage('Event submitted for review. It will appear publicly after approval.')
+      }
+      setEditingEventId(null)
       setNewEvent({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', registration_deadline:'', cover_image_url:'', capacity:'' })
       setEventFormOpen(false)
     } catch (error) {
@@ -623,10 +631,11 @@ export default function App() {
           </>}
       </section> : <section className="route-access section-wrap"><div className="eyebrow muted-eyebrow">SUPER ADMIN</div><h2>Admin access required</h2><p>Sign in with an administrator account to manage Campusly events.</p><button className="primary-button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); setAuthOpen(true) }}>Sign in <ArrowRight size={16}/></button></section>)}
       {page === 'organizer' && (user && (userRole === 'organizer' || userRole === 'admin') ? <section className="organizer-dashboard section-wrap" id="organizer-dashboard">
-        <div className="section-heading"><div><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Host an <span className="serif-accent">event.</span></h2><p>Submit campus events for review and publication.</p></div><button className="primary-button" onClick={() => { setEventFormOpen(!eventFormOpen); setEventFormError(''); setEventFormMessage('') }}>{eventFormOpen ? 'Close form' : 'Create event'}</button></div>
+        <div className="section-heading"><div><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Host an <span className="serif-accent">event.</span></h2><p>Submit campus events for review and publication.</p></div><button className="primary-button" onClick={() => { setEventFormOpen(!eventFormOpen); setEditingEventId(null); setEventFormError(''); setEventFormMessage(''); setNewEvent({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', registration_deadline:'', cover_image_url:'', capacity:'' }) }}>{eventFormOpen ? 'Close form' : 'Create event'}</button></div>
         {eventFormMessage && <p className="auth-message">{eventFormMessage}</p>}
         {eventFormError && <p className="auth-error" role="alert">{eventFormError}</p>}
         {eventFormOpen && <form className="organizer-form" onSubmit={handleCreateEvent}>
+          {editingEventId && <p className="auth-message">Editing event · changes are saved to the existing submission.</p>}
           <label>Event title<input required maxLength={120} value={newEvent.title} onChange={e=>setNewEvent({...newEvent,title:e.target.value})}/></label>
           <label>Description<textarea required rows={4} value={newEvent.description} onChange={e=>setNewEvent({...newEvent,description:e.target.value})}/></label>
           <div className="organizer-form-grid">
@@ -639,7 +648,7 @@ export default function App() {
           </div>
           <label>Registration deadline (optional)<input type="datetime-local" max={newEvent.starts_at || undefined} value={newEvent.registration_deadline} onChange={e=>setNewEvent({...newEvent,registration_deadline:e.target.value})}/></label>
           <label>Cover image URL (optional)<input type="url" placeholder="https://…" value={newEvent.cover_image_url} onChange={e=>setNewEvent({...newEvent,cover_image_url:e.target.value})}/></label>
-          <button className="primary-button" type="submit" disabled={eventSaving}>{eventSaving ? 'Submitting…' : 'Submit for review'} <ArrowRight size={16}/></button>
+          <button className="primary-button" type="submit" disabled={eventSaving}>{eventSaving ? 'Saving…' : editingEventId ? 'Save changes' : 'Submit for review'} <ArrowRight size={16}/></button>
           <small className="auth-footnote">New events are submitted as pending and require approval before public listing.</small>
         </form>}
         <div className="organizer-attendees">
@@ -648,7 +657,7 @@ export default function App() {
             const activeCount = organizerRegistrations.filter(registration => registration.event_id === item.id && registration.status === 'registered').length
             const capacityPercent = item.capacity && item.capacity > 0 ? Math.min(100, Math.round(activeCount / item.capacity * 100)) : null
             const remainingSeats = item.capacity !== null ? Math.max(0, item.capacity - activeCount) : null
-            return <article className="registration-item" key={item.id}><div><strong>{item.title}</strong><span>{item.category} · {item.venue}, {item.city}</span><small>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.starts_at))} · {activeCount} active registrations</small>{item.capacity !== null && <div className="organizer-capacity"><div className="organizer-capacity-label"><span>{activeCount} / {item.capacity} seats filled</span><span>{remainingSeats === 0 ? 'Full' : remainingSeats + ' remaining'}</span></div><div className="organizer-capacity-track" role="progressbar" aria-label={item.title + ' registration capacity'} aria-valuemin={0} aria-valuemax={item.capacity} aria-valuenow={Math.min(activeCount, item.capacity)}><span style={{width: capacityPercent + '%'}}/></div></div>}{item.registration_deadline && <small>Registration deadline: {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.registration_deadline))}</small>}<em className={item.status === 'published' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div></article>
+            return <article className="registration-item" key={item.id}><div><strong>{item.title}</strong><span>{item.category} · {item.venue}, {item.city}</span><small>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.starts_at))} · {activeCount} active registrations</small>{item.capacity !== null && <div className="organizer-capacity"><div className="organizer-capacity-label"><span>{activeCount} / {item.capacity} seats filled</span><span>{remainingSeats === 0 ? 'Full' : remainingSeats + ' remaining'}</span></div><div className="organizer-capacity-track" role="progressbar" aria-label={item.title + ' registration capacity'} aria-valuemin={0} aria-valuemax={item.capacity} aria-valuenow={Math.min(activeCount, item.capacity)}><span style={{width: capacityPercent + '%'}}/></div></div>}{item.registration_deadline && <small>Registration deadline: {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.registration_deadline))}</small>}<em className={item.status === 'published' ? 'registration-status active' : 'registration-status'}>{item.status}</em><button className="cancel-registration" type="button" onClick={() => { setEditingEventId(item.id); setNewEvent({ title:item.title, description:item.description, category:item.category, venue:item.venue, city:item.city, starts_at:new Date(item.starts_at).toISOString().slice(0,16), ends_at:new Date(item.ends_at).toISOString().slice(0,16), registration_deadline:item.registration_deadline ? new Date(item.registration_deadline).toISOString().slice(0,16) : '', cover_image_url:item.cover_image_url || '', capacity:item.capacity === null ? '' : String(item.capacity) }); setEventFormOpen(true); setEventFormError(''); setEventFormMessage('') }}>Edit event</button></div></article>
           })}</div>}
         </div>
         <div className="organizer-attendees">
