@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getMyRegistrations, getPublishedEvents, registerForEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
+import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, registerForEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -80,6 +80,8 @@ export default function App() {
   const [newEvent, setNewEvent] = useState({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
   const [adminEvents, setAdminEvents] = useState<EventRecord[]>([])
   const [adminRegistrations, setAdminRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string}>>([])
+  const [organizerRegistrations, setOrganizerRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string;event_title:string}>>([])
+  const [organizerAttendeesError, setOrganizerAttendeesError] = useState('')
   const [adminLoading, setAdminLoading] = useState(false)
   const [adminError, setAdminError] = useState('')
   const [adminBusy, setAdminBusy] = useState<string | null>(null)
@@ -227,6 +229,17 @@ export default function App() {
       setAdminBusy(null)
     }
   }
+
+  useEffect(() => {
+    let active = true
+    async function loadOrganizerRegistrations() {
+      if (!user || (userRole !== 'organizer' && userRole !== 'admin')) { setOrganizerRegistrations([]); return }
+      try { const records = await getOrganizerRegistrations(); if (active) { setOrganizerRegistrations(records); setOrganizerAttendeesError('') } }
+      catch (error) { if (active) setOrganizerAttendeesError(error instanceof Error ? error.message : 'Could not load attendee registrations.') }
+    }
+    loadOrganizerRegistrations()
+    return () => { active = false }
+  }, [user, userRole])
 
   async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -423,6 +436,11 @@ export default function App() {
           <button className="primary-button" type="submit" disabled={eventSaving}>{eventSaving ? 'Submitting…' : 'Submit for review'} <ArrowRight size={16}/></button>
           <small className="auth-footnote">New events are submitted as pending and require approval before public listing.</small>
         </form>}
+        <div className="organizer-attendees">
+          <div className="account-list-heading"><h3>Event attendees</h3><span>{organizerRegistrations.filter(item => item.status === 'registered').length} active registrations</span></div>
+          {organizerAttendeesError && <p className="auth-error" role="alert">{organizerAttendeesError}</p>}
+          {organizerRegistrations.length === 0 ? <div className="account-empty">Attendee registrations for your events will appear here.</div> : <div className="registration-list">{organizerRegistrations.map(item => <article className="registration-item" key={item.id}><div><strong>{item.event_title}</strong><span>Attendee ID: <code>{item.user_id}</code></span><small>Registered {new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.created_at))}</small><em className={item.status === 'registered' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div></article>)}</div>}
+        </div>
       </section>}
       {user && <section className="account-section section-wrap" id="my-account">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">YOUR CAMPUSLY SPACE</div><h2>My <span className="serif-accent">account.</span></h2><p>Manage your profile and keep track of your campus plans.</p></div></div>
