@@ -92,3 +92,9 @@
 .app-shell[data-page="admin"] .hero,.app-shell[data-page="admin"] .stats-strip,.app-shell[data-page="admin"] .events-section,.app-shell[data-page="admin"] .organizer-dashboard,.app-shell[data-page="admin"] .account-section,.app-shell[data-page="admin"] .organizer-section,.app-shell[data-page="admin"] .how-section{display:none}
 .app-shell[data-page="account"] .hero,.app-shell[data-page="account"] .stats-strip,.app-shell[data-page="account"] .events-section,.app-shell[data-page="account"] .super-admin,.app-shell[data-page="account"] .organizer-dashboard,.app-shell[data-page="account"] .organizer-section,.app-shell[data-page="account"] .how-section{display:none}
 .app-shell[data-page="organizer"] .organizer-dashboard,.app-shell[data-page="admin"] .super-admin,.app-shell[data-page="account"] .account-section{display:block}
+
+
+.event-card-actions{display:flex;align-items:center;gap:7px}
+.saved-event-button{border:1px solid #e6ebe2;background:#fff;color:#6e805f}
+.saved-event-button:disabled{opacity:.55;cursor:wait}
+.save-modal-button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:0 0 12px;padding:11px}
