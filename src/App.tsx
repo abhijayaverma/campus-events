@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, Bookmark, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
 import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getOrganizerEvents, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, getSavedEventIds, markRegistrationAttended, registerForEvent, saveEvent, unsaveEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
-import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
+import { getCurrentUser, resetPasswordWithEmail, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
 
 const categories = ['All events', 'Workshop', 'Hackathon', 'Talk', 'Cultural', 'Conference', 'Networking']
@@ -63,7 +63,8 @@ export default function App() {
   const [loadError, setLoadError] = useState('')
   const [user, setUser] = useState<User | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'reset'>('signin')
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -128,8 +129,15 @@ export default function App() {
   useEffect(() => {
     if (!supabase) return
     getCurrentUser().then(setUser).catch(() => setUser(null))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true)
+        setAuthMode('reset')
+        setAuthOpen(true)
+        setAuthError('')
+        setAuthMessage('Choose a new password for your account.')
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -140,7 +148,20 @@ export default function App() {
     setAuthError('')
     setAuthMessage('')
     try {
-      if (authMode === 'signup') {
+      if (authMode === 'reset') {
+        if (passwordRecovery) {
+          if (!supabase) throw new Error('Authentication is not configured.')
+          const { error } = await supabase.auth.updateUser({ password })
+          if (error) throw error
+          setPasswordRecovery(false)
+          setPassword('')
+          setAuthMode('signin')
+          setAuthMessage('Your password has been updated. You can now sign in.')
+        } else {
+          await resetPasswordWithEmail(email.trim())
+          setAuthMessage('If an account exists for that email, a password reset link has been sent.')
+        }
+      } else if (authMode === 'signup') {
         const result = await signUpWithEmail(email.trim(), password, fullName.trim())
         if (!result.session) {
           setAuthMessage('Account created. Check your email for a verification link, then sign in.')
@@ -666,17 +687,19 @@ export default function App() {
         <button className="modal-close" onClick={() => setAuthOpen(false)} aria-label="Close"><X size={20}/></button>
         <div className="auth-modal-content">
           <div className="eyebrow muted-eyebrow">YOUR CAMPUS COMMUNITY</div>
-          <h2 id="auth-title">{authMode === 'signin' ? 'Welcome back.' : 'Create your account.'}</h2>
-          <p>{authMode === 'signin' ? 'Sign in to continue to Campusly.' : 'Join Campusly with your email address.'}</p>
+          <h2 id="auth-title">{authMode === 'reset' ? (passwordRecovery ? 'Set a new password.' : 'Reset your password.') : authMode === 'signin' ? 'Welcome back.' : 'Create your account.'}</h2>
+          <p>{authMode === 'reset' ? (passwordRecovery ? 'Choose a strong password to secure your account.' : 'Enter your account email and we will send you a reset link.') : authMode === 'signin' ? 'Sign in to continue to Campusly.' : 'Join Campusly with your email address.'}</p>
           <form className="auth-form" onSubmit={handleAuthSubmit}>
             {authMode === 'signup' && <label>Full name<input autoComplete="name" required value={fullName} onChange={event => setFullName(event.target.value)} placeholder="Your full name"/></label>}
-            <label>Email address<input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com"/></label>
-            <label>Password<input type="password" autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'} minLength={6} required value={password} onChange={event => setPassword(event.target.value)} placeholder="At least 6 characters"/></label>
+            {!(authMode === 'reset' && passwordRecovery) && <label>Email address<input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com"/></label>}
+            {(authMode !== 'reset' || passwordRecovery) && <label>{authMode === 'reset' ? 'New password' : 'Password'}<input type="password" autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'} minLength={6} required value={password} onChange={event => setPassword(event.target.value)} placeholder="At least 6 characters"/></label>}
             {authError && <p className="auth-error" role="alert">{authError}</p>}
             {authMessage && <p className="auth-message" role="status">{authMessage}</p>}
-            <button className="primary-button modal-register" type="submit" disabled={authBusy}>{authBusy ? 'Please wait…' : authMode === 'signin' ? 'Sign in' : 'Create account'} <ArrowRight size={17}/></button>
+            <button className="primary-button modal-register" type="submit" disabled={authBusy}>{authBusy ? 'Please wait…' : authMode === 'reset' ? (passwordRecovery ? 'Update password' : 'Send reset link') : authMode === 'signin' ? 'Sign in' : 'Create account'} <ArrowRight size={17}/></button>
           </form>
-          <p className="auth-switch">{authMode === 'signin' ? "New to Campusly?" : 'Already have an account?'} <button type="button" onClick={() => { setAuthMode(authMode === 'signin' ? 'signup' : 'signin'); setAuthError(''); setAuthMessage('') }}>{authMode === 'signin' ? 'Create an account' : 'Sign in'}</button></p>
+          {authMode === 'signin' && <p className="auth-switch"><button type="button" onClick={() => { setAuthMode('reset'); setAuthError(''); setAuthMessage(''); setPasswordRecovery(false) }}>Forgot password?</button></p>}
+          {authMode !== 'reset' && <p className="auth-switch">{authMode === 'signin' ? "New to Campusly?" : 'Already have an account?'} <button type="button" onClick={() => { setAuthMode(authMode === 'signin' ? 'signup' : 'signin'); setAuthError(''); setAuthMessage('') }}>{authMode === 'signin' ? 'Create an account' : 'Sign in'}</button></p>}
+          {authMode === 'reset' && !passwordRecovery && <p className="auth-switch"><button type="button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage('') }}>Back to sign in</button></p>}
           <small className="auth-footnote">Student accounts are created with the standard student role. Organizer access is granted separately.</small>
         </div>
       </section>
