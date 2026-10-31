@@ -88,7 +88,7 @@ export default function App() {
   const [eventSaving, setEventSaving] = useState(false)
   const [eventFormError, setEventFormError] = useState('')
   const [eventFormMessage, setEventFormMessage] = useState('')
-  const [newEvent, setNewEvent] = useState({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
+  const [newEvent, setNewEvent] = useState({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', registration_deadline:'', cover_image_url:'', capacity:'' })
   const [adminEvents, setAdminEvents] = useState<EventRecord[]>([])
   const [adminRegistrations, setAdminRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string}>>([])
   const [organizerEvents, setOrganizerEvents] = useState<EventRecord[]>([])
@@ -343,6 +343,11 @@ export default function App() {
       setEventFormError('Event end date and time must be later than the start date and time.')
       return
     }
+    const deadlineTime = newEvent.registration_deadline ? new Date(newEvent.registration_deadline).getTime() : null
+    if (deadlineTime !== null && (!Number.isFinite(deadlineTime) || deadlineTime > startTime)) {
+      setEventFormError('The registration deadline must be on or before the event start time.')
+      return
+    }
 
     setEventSaving(true)
     try {
@@ -354,6 +359,7 @@ export default function App() {
         city: newEvent.city.trim(),
         starts_at: new Date(newEvent.starts_at).toISOString(),
         ends_at: new Date(newEvent.ends_at).toISOString(),
+        registration_deadline: newEvent.registration_deadline ? new Date(newEvent.registration_deadline).toISOString() : undefined,
         cover_image_url: newEvent.cover_image_url.trim() || undefined,
         capacity: newEvent.capacity ? Number(newEvent.capacity) : undefined,
         status: 'pending',
@@ -600,6 +606,7 @@ export default function App() {
             <label>Starts at<input type="datetime-local" required value={newEvent.starts_at} onChange={e=>setNewEvent({...newEvent,starts_at:e.target.value})}/></label>
             <label>Ends at<input type="datetime-local" required min={newEvent.starts_at || undefined} value={newEvent.ends_at} onChange={e=>setNewEvent({...newEvent,ends_at:e.target.value})}/></label>
           </div>
+          <label>Registration deadline (optional)<input type="datetime-local" max={newEvent.starts_at || undefined} value={newEvent.registration_deadline} onChange={e=>setNewEvent({...newEvent,registration_deadline:e.target.value})}/></label>
           <label>Cover image URL (optional)<input type="url" placeholder="https://…" value={newEvent.cover_image_url} onChange={e=>setNewEvent({...newEvent,cover_image_url:e.target.value})}/></label>
           <button className="primary-button" type="submit" disabled={eventSaving}>{eventSaving ? 'Submitting…' : 'Submit for review'} <ArrowRight size={16}/></button>
           <small className="auth-footnote">New events are submitted as pending and require approval before public listing.</small>
