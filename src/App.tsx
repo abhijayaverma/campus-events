@@ -295,6 +295,19 @@ export default function App() {
     return () => { active = false }
   }, [user, userRole])
 
+  async function handleMarkAttended(registrationId: string) {
+    setAttendeeCheckInBusy(registrationId)
+    setOrganizerAttendeesError('')
+    try {
+      await markRegistrationAttended(registrationId)
+      setOrganizerRegistrations(current => current.map(item => item.id === registrationId ? { ...item, status: 'attended' } : item))
+    } catch (error) {
+      setOrganizerAttendeesError(error instanceof Error ? error.message : 'Could not check in this attendee.')
+    } finally {
+      setAttendeeCheckInBusy(null)
+    }
+  }
+
   function exportOrganizerAttendees(filteredOnly = false) {
     const exportRows = filteredOnly ? filteredOrganizerRegistrations : organizerRegistrations
     if (exportRows.length === 0) return
