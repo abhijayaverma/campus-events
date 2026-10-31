@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { getPublishedEvents, type EventRecord } from './lib/events'
+import { getPublishedEvents, registerForEvent, type EventRecord } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -65,6 +65,9 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false)
   const [authError, setAuthError] = useState('')
   const [authMessage, setAuthMessage] = useState('')
+  const [registrationBusy, setRegistrationBusy] = useState(false)
+  const [registrationMessage, setRegistrationMessage] = useState('')
+  const [registrationError, setRegistrationError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -122,6 +125,31 @@ export default function App() {
       setAuthError(error instanceof Error ? error.message : 'Authentication failed. Please try again.')
     } finally {
       setAuthBusy(false)
+    }
+  }
+
+  async function handleRegister() {
+    if (!user) {
+      setAuthMode('signin')
+      setAuthError('')
+      setAuthMessage('Sign in to register for this event.')
+      setAuthOpen(true)
+      return
+    }
+    if (!selected) return
+    setRegistrationBusy(true)
+    setRegistrationError('')
+    setRegistrationMessage('')
+    try {
+      await registerForEvent(selected.id)
+      setRegistrationMessage('You are registered for this event. Your place has been recorded.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Registration could not be completed.'
+      setRegistrationError(message.includes('duplicate') || message.includes('unique')
+        ? 'You are already registered for this event.'
+        : message)
+    } finally {
+      setRegistrationBusy(false)
     }
   }
 
@@ -219,6 +247,10 @@ export default function App() {
         </div>
       </section>
     </div>}
-    {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}><section className="event-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelectedEvent(null)} aria-label="Close"><X size={20}/></button><img className="modal-image" src={selected.image} alt=""/><div className="modal-content"><div className="event-meta"><span>{selected.category}</span><span className="meta-dot"/> {selected.date}</div><h2 id="modal-title">{selected.title}</h2><div className="modal-detail"><MapPin size={16}/>{selected.venue}, {selected.city}</div><div className="modal-detail"><CalendarDays size={16}/>{selected.time}</div><p>{selected.description}</p><p>Registration will be available once the account and registration experience is enabled.</p><button className="primary-button modal-register" onClick={() => setSelectedEvent(null)}>Got it <ArrowRight size={17}/></button></div></section></div>}
+    {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}><section className="event-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelectedEvent(null)} aria-label="Close"><X size={20}/></button><img className="modal-image" src={selected.image} alt=""/><div className="modal-content"><div className="event-meta"><span>{selected.category}</span><span className="meta-dot"/> {selected.date}</div><h2 id="modal-title">{selected.title}</h2><div className="modal-detail"><MapPin size={16}/>{selected.venue}, {selected.city}</div><div className="modal-detail"><CalendarDays size={16}/>{selected.time}</div><p>{selected.description}</p>
+          {registrationError && <p className="auth-error" role="alert">{registrationError}</p>}
+          {registrationMessage && <p className="auth-message" role="status">{registrationMessage}</p>}
+          <button className="primary-button modal-register" onClick={handleRegister} disabled={registrationBusy || Boolean(registrationMessage)}>{registrationBusy ? 'Registering…' : registrationMessage ? 'Registered' : user ? 'Register for event' : 'Sign in to register'} <ArrowRight size={17}/></button>
+          <small className="auth-footnote">Registration is subject to event capacity and the organizer's registration deadline.</small></div></section></div>}
   </div>
 }
