@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { cancelRegistration, createEvent, getAdminEvents, getMyRegistrations, getPublishedEvents, registerForEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
+import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getMyRegistrations, getPublishedEvents, registerForEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -79,6 +79,7 @@ export default function App() {
   const [eventFormMessage, setEventFormMessage] = useState('')
   const [newEvent, setNewEvent] = useState({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
   const [adminEvents, setAdminEvents] = useState<EventRecord[]>([])
+  const [adminRegistrations, setAdminRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string}>>([])
   const [adminLoading, setAdminLoading] = useState(false)
   const [adminError, setAdminError] = useState('')
   const [adminBusy, setAdminBusy] = useState<string | null>(null)
@@ -194,8 +195,8 @@ export default function App() {
       setAdminLoading(true)
       setAdminError('')
       try {
-        const records = await getAdminEvents()
-        if (active) setAdminEvents(records)
+        const [records, registrations] = await Promise.all([getAdminEvents(), getAdminRegistrations()])
+        if (active) { setAdminEvents(records); setAdminRegistrations(registrations) }
       } catch (error) {
         if (active) setAdminError(error instanceof Error ? error.message : 'Could not load the event directory.')
       } finally {
@@ -205,6 +206,10 @@ export default function App() {
     loadAdminEvents()
     return () => { active = false }
   }, [user, userRole])
+
+  const activeAdminRegistrations = adminRegistrations.filter(item => item.status === 'registered')
+  const popularAdminEvents = adminEvents.map(item => ({ ...item, registrations: activeAdminRegistrations.filter(registration => registration.event_id === item.id).length }))
+    .sort((a, b) => b.registrations - a.registrations).slice(0, 5)
 
   async function handleAdminEventStatus(eventId: string, status: EventRecord['status']) {
     setAdminBusy(eventId)
@@ -369,12 +374,20 @@ export default function App() {
         </div>
       </section>
       {user && userRole === 'admin' && <section className="super-admin section-wrap" id="super-admin">
-        <div className="section-heading"><div><div className="eyebrow muted-eyebrow">CAMPUSLY CONTROL CENTRE</div><h2>Super admin <span className="serif-accent">portal.</span></h2><p>Review every event submitted across Campusly and manage its publication status.</p></div><button className="primary-button" onClick={async () => { setAdminLoading(true); try { setAdminEvents(await getAdminEvents()) } catch (error) { setAdminError(error instanceof Error ? error.message : 'Could not refresh events.') } finally { setAdminLoading(false) } }}>Refresh events</button></div>
+        <div className="section-heading"><div><div className="eyebrow muted-eyebrow">CAMPUSLY CONTROL CENTRE</div><h2>Super admin <span className="serif-accent">portal.</span></h2><p>Review every event submitted across Campusly and manage its publication status.</p></div><button className="primary-button" onClick={async () => { setAdminLoading(true); try { setAdminEvents(await getAdminEvents()); setAdminRegistrations(await getAdminRegistrations()) } catch (error) { setAdminError(error instanceof Error ? error.message : 'Could not refresh events.') } finally { setAdminLoading(false) } }}>Refresh events</button></div>
         <div className="admin-stats">
           <div><span>Total events</span><strong>{adminEvents.length}</strong></div>
           <div><span>Pending review</span><strong>{adminEvents.filter(item => item.status === 'pending').length}</strong></div>
           <div><span>Published</span><strong>{adminEvents.filter(item => item.status === 'published').length}</strong></div>
           <div><span>Rejected / cancelled</span><strong>{adminEvents.filter(item => item.status === 'rejected' || item.status === 'cancelled').length}</strong></div>
+          <div><span>Total registrations</span><strong>{adminRegistrations.length}</strong></div>
+          <div><span>Active registrations</span><strong>{activeAdminRegistrations.length}</strong></div>
+          <div><span>Unique attendees</span><strong>{new Set(activeAdminRegistrations.map(item => item.user_id)).size}</strong></div>
+          <div><span>Events with registrations</span><strong>{new Set(activeAdminRegistrations.map(item => item.event_id)).size}</strong></div>
+        </div>
+        <div className="admin-analytics">
+          <div className="admin-analytics-heading"><div><span className="eyebrow muted-eyebrow">AUDIENCE INSIGHTS</span><h3>Most popular events</h3></div><span>By active registrations</span></div>
+          {popularAdminEvents.length === 0 || popularAdminEvents.every(item => item.registrations === 0) ? <p className="admin-analytics-empty">Registration data will appear here as students book their places.</p> : <div className="admin-popular-list">{popularAdminEvents.map(item => <div className="admin-popular-row" key={item.id}><span title={item.title}>{item.title}</span><div className="admin-bar-track"><i style={{width:`${Math.max(3, item.registrations / Math.max(...popularAdminEvents.map(event => event.registrations)) * 100)}%`}}/></div><strong>{item.registrations}</strong></div>)}</div>}
         </div>
         {adminError && <p className="auth-error" role="alert">{adminError}</p>}
         {adminLoading ? <div className="account-empty">Loading the Campusly event directory…</div> : adminEvents.length === 0 ? <div className="account-empty">No events have been submitted yet.</div> :
