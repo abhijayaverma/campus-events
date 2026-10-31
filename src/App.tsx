@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, Bookmark, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, getSavedEventIds, registerForEvent, saveEvent, unsaveEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
+import { cancelRegistration, createEvent, getAdminEvents, getAdminRegistrations, getOrganizerEvents, getOrganizerRegistrations, getMyRegistrations, getPublishedEvents, getSavedEventIds, registerForEvent, saveEvent, unsaveEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -86,6 +86,7 @@ export default function App() {
   const [newEvent, setNewEvent] = useState({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
   const [adminEvents, setAdminEvents] = useState<EventRecord[]>([])
   const [adminRegistrations, setAdminRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string}>>([])
+  const [organizerEvents, setOrganizerEvents] = useState<EventRecord[]>([])
   const [organizerRegistrations, setOrganizerRegistrations] = useState<Array<{id:string;event_id:string;user_id:string;status:string;created_at:string;event_title:string}>>([])
   const [organizerAttendeesError, setOrganizerAttendeesError] = useState('')
   const [adminLoading, setAdminLoading] = useState(false)
@@ -271,8 +272,8 @@ export default function App() {
   useEffect(() => {
     let active = true
     async function loadOrganizerRegistrations() {
-      if (!user || (userRole !== 'organizer' && userRole !== 'admin')) { setOrganizerRegistrations([]); return }
-      try { const records = await getOrganizerRegistrations(); if (active) { setOrganizerRegistrations(records); setOrganizerAttendeesError('') } }
+      if (!user || (userRole !== 'organizer' && userRole !== 'admin')) { setOrganizerRegistrations([]); setOrganizerEvents([]); return }
+      try { const [records, ownedEvents] = await Promise.all([getOrganizerRegistrations(), getOrganizerEvents()]); if (active) { setOrganizerRegistrations(records); setOrganizerEvents(ownedEvents); setOrganizerAttendeesError('') } }
       catch (error) { if (active) setOrganizerAttendeesError(error instanceof Error ? error.message : 'Could not load attendee registrations.') }
     }
     loadOrganizerRegistrations()
@@ -310,6 +311,7 @@ export default function App() {
         status: 'pending',
       }
       await createEvent(payload)
+      setOrganizerEvents(await getOrganizerEvents())
       setEventFormMessage('Event submitted for review. It will appear publicly after approval.')
       setNewEvent({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
       setEventFormOpen(false)
@@ -525,6 +527,13 @@ export default function App() {
           <button className="primary-button" type="submit" disabled={eventSaving}>{eventSaving ? 'Submitting…' : 'Submit for review'} <ArrowRight size={16}/></button>
           <small className="auth-footnote">New events are submitted as pending and require approval before public listing.</small>
         </form>}
+        <div className="organizer-attendees">
+          <div className="account-list-heading"><h3>My events</h3><span>{organizerEvents.length} submitted</span></div>
+          {organizerEvents.length === 0 ? <div className="account-empty">Events you submit will appear here with their review status.</div> : <div className="registration-list">{organizerEvents.map(item => {
+            const activeCount = organizerRegistrations.filter(registration => registration.event_id === item.id && registration.status === 'registered').length
+            return <article className="registration-item" key={item.id}><div><strong>{item.title}</strong><span>{item.category} · {item.venue}, {item.city}</span><small>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.starts_at))} · {activeCount} active registrations</small><em className={item.status === 'published' ? 'registration-status active' : 'registration-status'}>{item.status}</em></div></article>
+          })}</div>}
+        </div>
         <div className="organizer-attendees">
           <div className="account-list-heading"><h3>Event attendees</h3><span>{organizerRegistrations.filter(item => item.status === 'registered').length} active registrations</span></div>
           {organizerAttendeesError && <p className="auth-error" role="alert">{organizerAttendeesError}</p>}
