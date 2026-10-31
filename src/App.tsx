@@ -185,9 +185,21 @@ export default function App() {
 
   async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setEventSaving(true)
     setEventFormError('')
     setEventFormMessage('')
+
+    const startTime = new Date(newEvent.starts_at).getTime()
+    const endTime = new Date(newEvent.ends_at).getTime()
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+      setEventFormError('Please enter valid event start and end dates.')
+      return
+    }
+    if (endTime <= startTime) {
+      setEventFormError('Event end date and time must be later than the start date and time.')
+      return
+    }
+
+    setEventSaving(true)
     try {
       const payload: NewEvent = {
         title: newEvent.title.trim(),
@@ -328,7 +340,7 @@ export default function App() {
             <label>Venue<input required value={newEvent.venue} onChange={e=>setNewEvent({...newEvent,venue:e.target.value})}/></label>
             <label>Capacity (optional)<input type="number" min="1" value={newEvent.capacity} onChange={e=>setNewEvent({...newEvent,capacity:e.target.value})}/></label>
             <label>Starts at<input type="datetime-local" required value={newEvent.starts_at} onChange={e=>setNewEvent({...newEvent,starts_at:e.target.value})}/></label>
-            <label>Ends at<input type="datetime-local" required value={newEvent.ends_at} onChange={e=>setNewEvent({...newEvent,ends_at:e.target.value})}/></label>
+            <label>Ends at<input type="datetime-local" required min={newEvent.starts_at || undefined} value={newEvent.ends_at} onChange={e=>setNewEvent({...newEvent,ends_at:e.target.value})}/></label>
           </div>
           <label>Cover image URL (optional)<input type="url" placeholder="https://…" value={newEvent.cover_image_url} onChange={e=>setNewEvent({...newEvent,cover_image_url:e.target.value})}/></label>
           <button className="primary-button" type="submit" disabled={eventSaving}>{eventSaving ? 'Submitting…' : 'Submit for review'} <ArrowRight size={16}/></button>
