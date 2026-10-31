@@ -19,6 +19,8 @@ type CampusEvent = {
   city: string
   price: string
   image: string
+  capacity: number | null
+  registrationDeadline: string | null
 }
 
 function formatEvent(record: EventRecord): CampusEvent {
@@ -44,6 +46,8 @@ function formatEvent(record: EventRecord): CampusEvent {
     city: record.city,
     price: 'Registration',
     image: record.cover_image_url || 'https://images.unsplash.com/photo-1523580494863-6f3031224c94?auto=format&fit=crop&w=1000&q=85',
+    capacity: record.capacity,
+    registrationDeadline: record.registration_deadline,
   }
 }
 
@@ -653,7 +657,7 @@ export default function App() {
         </div>
       </section>
     </div>}
-    {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}><section className="event-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelectedEvent(null)} aria-label="Close"><X size={20}/></button><img className="modal-image" src={selected.image} alt=""/><div className="modal-content"><div className="event-meta"><span>{selected.category}</span><span className="meta-dot"/> {selected.date}</div><h2 id="modal-title">{selected.title}</h2><div className="modal-detail"><MapPin size={16}/>{selected.venue}, {selected.city}</div><div className="modal-detail"><CalendarDays size={16}/>{selected.time}</div><p>{selected.description}</p>
+    {selected && <div className="modal-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}><section className="event-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelectedEvent(null)} aria-label="Close"><X size={20}/></button><img className="modal-image" src={selected.image} alt=""/><div className="modal-content"><div className="event-meta"><span>{selected.category}</span><span className="meta-dot"/> {selected.date}</div><h2 id="modal-title">{selected.title}</h2><div className="modal-detail"><MapPin size={16}/>{selected.venue}, {selected.city}</div><div className="modal-detail"><CalendarDays size={16}/>{selected.time}</div>{selected.capacity !== null && <div className="modal-detail"><Users size={16}/>Limited to {selected.capacity} participants</div>}{selected.registrationDeadline && <div className="modal-detail"><CalendarDays size={16}/>Registration closes {new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(selected.registrationDeadline))}</div>}<p>{selected.description}</p>
           <button className="cancel-registration save-modal-button" onClick={handleShareEvent}><ArrowRight size={15}/> Share event</button>
           {shareMessage && <p className="auth-message" role="status">{shareMessage}</p>}
           <button className="cancel-registration save-modal-button" disabled={savedBusy === selected.id} onClick={() => handleToggleSaved(selected.id)}><Bookmark size={15} fill={savedEventIds.includes(selected.id) ? 'currentColor' : 'none'}/> {savedEventIds.includes(selected.id) ? 'Saved to your account' : 'Save this event'}</button>
