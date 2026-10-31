@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CalendarDays, ChevronDown, Compass, GraduationCap, MapPin, Menu, Search, Sparkles, Ticket, Users, X } from 'lucide-react'
-import { cancelRegistration, createEvent, getMyRegistrations, getPublishedEvents, registerForEvent, type EventRecord, type NewEvent } from './lib/events'
+import { cancelRegistration, createEvent, getAdminEvents, getMyRegistrations, getPublishedEvents, registerForEvent, setAdminEventStatus, type EventRecord, type NewEvent } from './lib/events'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { getCurrentUser, signInWithEmail, signOut, signUpWithEmail } from './lib/auth'
 import type { User } from '@supabase/supabase-js'
@@ -78,6 +78,10 @@ export default function App() {
   const [eventFormError, setEventFormError] = useState('')
   const [eventFormMessage, setEventFormMessage] = useState('')
   const [newEvent, setNewEvent] = useState({ title:'', description:'', category:'Workshop', venue:'', city:'Kanpur', starts_at:'', ends_at:'', cover_image_url:'', capacity:'' })
+  const [adminEvents, setAdminEvents] = useState<EventRecord[]>([])
+  const [adminLoading, setAdminLoading] = useState(false)
+  const [adminError, setAdminError] = useState('')
+  const [adminBusy, setAdminBusy] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -183,6 +187,42 @@ export default function App() {
     return () => { active = false }
   }, [user])
 
+  useEffect(() => {
+    let active = true
+    async function loadAdminEvents() {
+      if (!user || userRole !== 'admin') return
+      setAdminLoading(true)
+      setAdminError('')
+      try {
+        const records = await getAdminEvents()
+        if (active) setAdminEvents(records)
+      } catch (error) {
+        if (active) setAdminError(error instanceof Error ? error.message : 'Could not load the event directory.')
+      } finally {
+        if (active) setAdminLoading(false)
+      }
+    }
+    loadAdminEvents()
+    return () => { active = false }
+  }, [user, userRole])
+
+  async function handleAdminEventStatus(eventId: string, status: EventRecord['status']) {
+    setAdminBusy(eventId)
+    setAdminError('')
+    try {
+      const updated = await setAdminEventStatus(eventId, status)
+      setAdminEvents(current => current.map(item => item.id === eventId ? updated : item))
+      if (status === 'published') {
+        const records = await getPublishedEvents()
+        setEvents(records.map(formatEvent))
+      }
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : 'Could not update this event.')
+    } finally {
+      setAdminBusy(null)
+    }
+  }
+
   async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setEventFormError('')
@@ -282,6 +322,7 @@ export default function App() {
         <a className="nav-link active" href="#explore" onClick={() => setMobileMenuOpen(false)}>Discover</a>
         <a className="nav-link" href="#how-it-works" onClick={() => setMobileMenuOpen(false)}>How it works</a>
         <a className="nav-link" href="#organizers" onClick={() => setMobileMenuOpen(false)}>For organizers</a>
+        {user && userRole === 'admin' && <a className="nav-link" href="#super-admin" onClick={() => setMobileMenuOpen(false)}>Super Admin</a>}
       </nav>
       <div className="header-actions">
         <button className="text-button" onClick={() => document.getElementById(user && (userRole === 'organizer' || userRole === 'admin') ? 'organizer-dashboard' : 'organizers')?.scrollIntoView({ behavior: 'smooth' })}>Host an event</button>
@@ -327,6 +368,29 @@ export default function App() {
           {!loading && filtered.length === 0 && <div className="empty-state"><Search size={28}/><h3>{loadError ? 'Events could not be loaded' : 'No published events yet'}</h3><p>{loadError || 'There are no published events matching your filters. Check back soon or try another city.'}</p><button className="text-button" onClick={() => { setQuery(''); setActiveCategory('All events'); setCity('All cities') }}>Clear filters</button></div>}
         </div>
       </section>
+      {user && userRole === 'admin' && <section className="super-admin section-wrap" id="super-admin">
+        <div className="section-heading"><div><div className="eyebrow muted-eyebrow">CAMPUSLY CONTROL CENTRE</div><h2>Super admin <span className="serif-accent">portal.</span></h2><p>Review every event submitted across Campusly and manage its publication status.</p></div><button className="primary-button" onClick={async () => { setAdminLoading(true); try { setAdminEvents(await getAdminEvents()) } catch (error) { setAdminError(error instanceof Error ? error.message : 'Could not refresh events.') } finally { setAdminLoading(false) } }}>Refresh events</button></div>
+        <div className="admin-stats">
+          <div><span>Total events</span><strong>{adminEvents.length}</strong></div>
+          <div><span>Pending review</span><strong>{adminEvents.filter(item => item.status === 'pending').length}</strong></div>
+          <div><span>Published</span><strong>{adminEvents.filter(item => item.status === 'published').length}</strong></div>
+          <div><span>Rejected / cancelled</span><strong>{adminEvents.filter(item => item.status === 'rejected' || item.status === 'cancelled').length}</strong></div>
+        </div>
+        {adminError && <p className="auth-error" role="alert">{adminError}</p>}
+        {adminLoading ? <div className="account-empty">Loading the Campusly event directory…</div> : adminEvents.length === 0 ? <div className="account-empty">No events have been submitted yet.</div> :
+          <div className="admin-event-list">{adminEvents.map(item => <article className="admin-event-card" key={item.id}>
+            <div className="admin-event-top"><div><span className="admin-category">{item.category}</span><h3>{item.title}</h3></div><span className={'admin-status status-' + item.status}>{item.status}</span></div>
+            <p>{item.description}</p>
+            <div className="admin-event-details"><span><strong>Venue</strong>{item.venue}, {item.city}</span><span><strong>Starts</strong>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.starts_at))}</span><span><strong>Ends</strong>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.ends_at))}</span><span><strong>Organizer ID</strong><code>{item.organizer_id}</code></span><span><strong>Capacity</strong>{item.capacity ?? 'Not specified'}</span><span><strong>Submitted</strong>{new Intl.DateTimeFormat('en-IN',{dateStyle:'medium'}).format(new Date(item.created_at))}</span></div>
+            {item.cover_image_url && <a className="admin-image-link" href={item.cover_image_url} target="_blank" rel="noreferrer">View cover image</a>}
+            <div className="admin-event-actions">
+              {item.status !== 'published' && <button className="primary-button" disabled={adminBusy === item.id} onClick={() => handleAdminEventStatus(item.id,'published')}>{adminBusy === item.id ? 'Updating…' : 'Approve & publish'}</button>}
+              {item.status !== 'rejected' && item.status !== 'published' && <button className="admin-reject" disabled={adminBusy === item.id} onClick={() => handleAdminEventStatus(item.id,'rejected')}>Reject submission</button>}
+              {item.status === 'published' && <button className="admin-reject" disabled={adminBusy === item.id} onClick={() => handleAdminEventStatus(item.id,'cancelled')}>Unpublish event</button>}
+              {item.status === 'rejected' && <button className="admin-reject" disabled={adminBusy === item.id} onClick={() => handleAdminEventStatus(item.id,'pending')}>Restore to pending</button>}
+            </div>
+          </article>)}</div>}
+      </section>}
       {user && (userRole === 'organizer' || userRole === 'admin') && <section className="organizer-dashboard section-wrap" id="organizer-dashboard">
         <div className="section-heading"><div><div className="eyebrow muted-eyebrow">ORGANIZER WORKSPACE</div><h2>Host an <span className="serif-accent">event.</span></h2><p>Submit campus events for review and publication.</p></div><button className="primary-button" onClick={() => { setEventFormOpen(!eventFormOpen); setEventFormError(''); setEventFormMessage('') }}>{eventFormOpen ? 'Close form' : 'Create event'}</button></div>
         {eventFormMessage && <p className="auth-message">{eventFormMessage}</p>}
