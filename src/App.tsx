@@ -328,7 +328,7 @@ export default function App() {
     (activeCategory === 'All events' || event.category.toLowerCase() === activeCategory.toLowerCase()) &&
     (city === 'All cities' || event.city.toLowerCase() === city.toLowerCase()) &&
     `${event.title} ${event.category} ${event.city} ${event.venue}`.toLowerCase().includes(query.toLowerCase())
-  ), [activeCategory, query, city])
+  ), [events, activeCategory, query, city])
   const featured = filtered[0]
   const selected = events.find(event => event.id === selectedEvent)
   const goExplore = () => window.location.assign('/events')
